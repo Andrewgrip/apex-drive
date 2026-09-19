@@ -22,6 +22,7 @@ export interface SimOptions {
 export type SimEvent = "shift" | "grind" | "stall" | "start" | "deny" | "hit";
 
 const G = 9.81;
+const CG_HEIGHT = 0.52; // centre of gravity height (m), for weight transfer
 const TWO_PI = Math.PI * 2;
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const smooth = (e0: number, e1: number, x: number) => {
@@ -62,6 +63,10 @@ export class VehicleSim {
   private wheelspinT = 0;
   drifting = false;
   driftAngle = 0;
+  /** smoothed longitudinal acceleration (m/s²), used for weight transfer and body pitch */
+  accel = 0;
+  /** smoothed lateral acceleration, positive when turning right (m/s²) */
+  latAccel = 0;
   wheelOmegaVisual = 0;
   events: SimEvent[] = [];
 
@@ -87,6 +92,8 @@ export class VehicleSim {
     this.stalled = false;
     this.starter = 0;
     this.wheelspinT = 0;
+    this.accel = 0;
+    this.latAccel = 0;
     this.events.length = 0;
     this.updatePose();
   }
@@ -106,7 +113,13 @@ export class VehicleSim {
     const dt = Math.min(rawDt, 0.05);
     this.handleTransmission(dt, input, opts);
     const n = 4;
+    const vBefore = this.vFwd;
     for (let i = 0; i < n; i++) this.integrate(dt / n, input, opts);
+    if (dt > 0) {
+      const k = 1 - Math.exp(-8 * dt);
+      this.accel += ((this.vFwd - vBefore) / dt - this.accel) * k;
+      this.latAccel += (-this.yawRate * this.vFwd - this.latAccel) * k;
+    }
     this.collide();
     this.updatePose();
     // visual wheel spin: wheelspin makes the driven wheels spin faster than the road speed
@@ -266,11 +279,14 @@ export class VehicleSim {
       const Tmax = s.maxTorque * 1.8 * this.clutch;
       Tcl = clamp(slipRpm / 120, -1, 1) * Tmax;
       const latUse = clamp(Math.abs(this.vLat) / 6, 0, 1);
-      const Ftmax = s.grip * s.mass * G * 0.55 * (1 - 0.5 * latUse);
+      // Weight moves onto the driven rear axle under acceleration (h/L * a/g), so a hard launch
+      // bites harder than a gentle one instead of using a fixed static weight share.
+      const rearShare = clamp(0.52 + (CG_HEIGHT / s.wheelbase) * (this.accel / G), 0.42, 0.78);
+      const Ftmax = s.grip * s.mass * G * rearShare * (1 - 0.5 * latUse);
       let F = (Tcl * ratio) / s.wheelRadius;
       if (Math.abs(F) > Ftmax) {
         this.wheelspinT += dt;
-        F = Math.sign(F) * Ftmax * 0.75;
+        F = Math.sign(F) * Ftmax * 0.92;
         Tcl = (F * s.wheelRadius) / ratio;
       } else {
         this.wheelspinT = Math.max(0, this.wheelspinT - dt * 2);

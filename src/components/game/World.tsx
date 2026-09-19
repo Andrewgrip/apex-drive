@@ -249,6 +249,15 @@ function Trees() {
 }
 
 // ---------- Sky / sun / day-night ----------
+/** `?time=0..1` starts the sky at that time of day (0.25 noon, 0.75 midnight) and pins it when the cycle is off. */
+const PINNED_TIME = (() => {
+  if (typeof location === "undefined") return null;
+  const v = new URLSearchParams(location.search).get("time");
+  const n = v === null ? Number.NaN : Number(v);
+  return Number.isFinite(n) && n >= 0 && n <= 1 ? n : null;
+})();
+if (PINNED_TIME !== null) environment.time = PINNED_TIME;
+
 const DAY = new THREE.Color("#8fc5ee");
 const DUSK = new THREE.Color("#f08a4a");
 const NIGHT = new THREE.Color("#070a16");
@@ -266,7 +275,7 @@ function SkyAndSun() {
 
   useFrame((_, delta) => {
     if (dayCycle) environment.time = (environment.time + delta / 480) % 1;
-    else environment.time = 0.2;
+    else environment.time = PINNED_TIME ?? 0.2;
     const theta = environment.time * Math.PI * 2;
     const elev = Math.sin(theta);
     environment.sunElevation = elev;
@@ -274,6 +283,8 @@ function SkyAndSun() {
     const duskness = 1 - Math.min(1, Math.abs(elev) * 4);
     tmpColor.copy(NIGHT).lerp(DAY, dayness);
     tmpColor.lerp(DUSK, duskness * 0.65);
+    // the image-based light is what lit the world at midnight: fade it with the sun
+    scene.environmentIntensity = 0.14 + dayness * 0.86;
     (scene.background as THREE.Color | null)?.copy?.(tmpColor);
     if (!scene.background) scene.background = tmpColor.clone();
     if (fog.current) fog.current.color.copy(tmpColor);

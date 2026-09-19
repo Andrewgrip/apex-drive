@@ -11,6 +11,7 @@ import { Hud } from "./Hud";
 import { MainMenu, PauseMenu } from "./Menus";
 import { Player } from "./Player";
 import { SettingsPanel } from "./SettingsPanel";
+import { TireEffects } from "./TireEffects";
 import { TouchControls } from "./TouchControls";
 import { useT } from "./useT";
 import { World } from "./World";
@@ -85,6 +86,7 @@ export function ApexDrive() {
           <World />
           <Gates />
           <Player carRef={carRef} />
+          <TireEffects />
           <CameraRig carRef={carRef} menu={screen === "menu"} />
         </Suspense>
       </Canvas>

@@ -1,9 +1,7 @@
-export type CarId = "hatchback" | "coupe" | "muscle";
+﻿export type CarId = "hatchback" | "coupe" | "muscle";
 
 export interface CarSpec {
   id: CarId;
-  model: string;
-  scale: number;
   mass: number;
   maxTorque: number;
   idleRpm: number;
@@ -24,15 +22,16 @@ export interface CarSpec {
   wheelbase: number;
   defaultColor: string;
   stats: { topSpeed: number; handling: number; grip: number; accel: number };
+  /** driver's eye position and bonnet-camera position, in car space (left-hand drive: driver at +x) */
+  eye: [number, number, number];
+  hoodCam: [number, number, number];
 }
 
 export const CARS: Record<CarId, CarSpec> = {
   hatchback: {
     id: "hatchback",
-    model: `${import.meta.env.BASE_URL}models/hatchback.glb`,
-    scale: 2.0,
     mass: 1150,
-    maxTorque: 185,
+    maxTorque: 240,
     idleRpm: 850,
     redline: 6800,
     maxRpm: 7300,
@@ -50,14 +49,14 @@ export const CARS: Record<CarId, CarSpec> = {
     maxSteer: 0.58,
     wheelbase: 2.5,
     defaultColor: "#ff7a1a",
-    stats: { topSpeed: 165, handling: 0.8, grip: 0.8, accel: 0.5 },
+    stats: { topSpeed: 195, handling: 0.8, grip: 0.7, accel: 0.55 },
+    eye: [0.34, 1.22, -0.15],
+    hoodCam: [0, 1.32, 0.85],
   },
   coupe: {
     id: "coupe",
-    model: `${import.meta.env.BASE_URL}models/coupe.glb`,
-    scale: 2.0,
     mass: 1350,
-    maxTorque: 340,
+    maxTorque: 520,
     idleRpm: 900,
     redline: 7600,
     maxRpm: 8100,
@@ -67,22 +66,22 @@ export const CARS: Record<CarId, CarSpec> = {
     finalDrive: 3.9,
     wheelRadius: 0.33,
     engineInertia: 0.2,
-    drag: 0.36,
+    drag: 0.41,
     brakeForce: 14000,
-    grip: 1.15,
+    grip: 1.25,
     gripLat: 10.5,
     driftGrip: 3.6,
     maxSteer: 0.55,
     wheelbase: 2.6,
     defaultColor: "#2fa4ff",
-    stats: { topSpeed: 250, handling: 0.95, grip: 0.9, accel: 0.8 },
+    stats: { topSpeed: 295, handling: 0.95, grip: 0.95, accel: 0.95 },
+    eye: [0.36, 1.02, -0.35],
+    hoodCam: [0, 1.18, 0.9],
   },
   muscle: {
     id: "muscle",
-    model: `${import.meta.env.BASE_URL}models/muscle.glb`,
-    scale: 2.0,
     mass: 1720,
-    maxTorque: 560,
+    maxTorque: 800,
     idleRpm: 750,
     redline: 6200,
     maxRpm: 6700,
@@ -92,15 +91,17 @@ export const CARS: Record<CarId, CarSpec> = {
     finalDrive: 3.55,
     wheelRadius: 0.35,
     engineInertia: 0.28,
-    drag: 0.44,
+    drag: 0.60,
     brakeForce: 15500,
-    grip: 0.92,
+    grip: 1.2,
     gripLat: 7.5,
     driftGrip: 2.6,
     maxSteer: 0.52,
     wheelbase: 2.9,
     defaultColor: "#d9d9d9",
-    stats: { topSpeed: 280, handling: 0.6, grip: 0.65, accel: 0.95 },
+    stats: { topSpeed: 290, handling: 0.6, grip: 0.8, accel: 0.85 },
+    eye: [0.36, 1.16, -0.4],
+    hoodCam: [0, 1.42, 1.0],
   },
 };
 
@@ -109,3 +110,7 @@ export function torqueCurve(t: number): number {
   const d = (t - 0.62) / 0.62;
   return Math.max(0.3, 1 - 0.65 * d * d);
 }
+
+
+
+

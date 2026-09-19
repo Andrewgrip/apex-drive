@@ -383,7 +383,7 @@ export function Hud() {
 
       <ModeOverlays m={modeSnap} />
 
-      <div className="absolute left-1/2 top-4 flex -translate-x-1/2 flex-col items-center gap-2">
+      <div className="absolute left-1/2 top-48 flex -translate-x-1/2 flex-col items-center gap-2 sm:top-4">
         <ModePanel m={modeSnap} />
         {tel.stalled && (
           <div className="animate-shake rounded-xl border border-destructive/60 bg-destructive/25 px-5 py-2 text-center backdrop-blur">

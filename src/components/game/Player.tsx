@@ -1,9 +1,9 @@
 import { useFrame } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
-import { Suspense, useCallback, useLayoutEffect, useMemo, useRef, type RefObject } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, type RefObject } from "react";
 import * as THREE from "three";
 import { audio } from "../../game/audio";
 import { CARS } from "../../game/cars";
+import { fx } from "../../game/effects";
 import { input, type Action } from "../../game/input";
 import { modeState, resetMode, spawnFor, updateMode } from "../../game/modes";
 import { useGame } from "../../game/store";
@@ -12,7 +12,18 @@ import { VehicleSim, type RawInput } from "../../game/vehicle";
 import { city, terrainHeight, WORLD_BOUND } from "../../game/world";
 import { CarModel, type CarParts } from "./CarModel";
 
-for (const car of Object.values(CARS)) useGLTF.preload(car.model);
+/** Body lean: a damped spring per axis, driven by the car's accelerations. */
+interface Suspension {
+  pitch: number;
+  pitchVel: number;
+  roll: number;
+  rollVel: number;
+}
+const SPRING = 90;
+const DAMPING = 11;
+const PITCH_PER_ACCEL = 0.0065; // rad of nose-up per m/s² of acceleration
+const ROLL_PER_ACCEL = 0.0075; // rad of body roll per m/s² of lateral acceleration
+const MAX_LEAN = 0.09;
 
 const GEAR_ACTIONS: ReadonlyArray<readonly [Action, number]> = [
   ["gearR", -1],
@@ -75,6 +86,7 @@ export function Player({ carRef }: PlayerProps) {
   const sim = useMemo(() => new VehicleSim(spec, terrainHeight, city.colliders, WORLD_BOUND), [spec]);
   const parts = useRef<CarParts | null>(null);
   const pedals = useRef({ fwd: 0, back: 0 });
+  const susp = useRef<Suspension>({ pitch: 0, pitchVel: 0, roll: 0, rollVel: 0 });
   const onParts = useCallback((p: CarParts) => {
     parts.current = p;
   }, []);
@@ -86,6 +98,8 @@ export function Player({ carRef }: PlayerProps) {
     audio.cylinders = spec.cylinders;
     pedals.current.fwd = 0;
     pedals.current.back = 0;
+    susp.current = { pitch: 0, pitchVel: 0, roll: 0, rollVel: 0 };
+    fx.reset();
     if (carRef.current) applyPose(carRef.current, sim);
     fillTelemetry(sim, false);
   }, [sim, spec, restartToken, gameMode, carRef]);
@@ -167,6 +181,23 @@ export function Player({ carRef }: PlayerProps) {
       const spin = sim.wheelOmegaVisual * delta;
       for (const w of wheels.allWheels) w.rotation.x += spin;
       for (const w of wheels.frontWheels) w.rotation.y = -sim.steer;
+      wheels.steeringWheel.rotation.z = sim.steer * 3.2;
+
+      // suspension: nose lifts on throttle and dives on the brakes, the body rolls out of corners
+      const s = susp.current;
+      const dt = Math.min(delta, 0.05);
+      const targetPitch = THREE.MathUtils.clamp(-sim.accel * PITCH_PER_ACCEL, -MAX_LEAN, MAX_LEAN);
+      const targetRoll = THREE.MathUtils.clamp(-sim.latAccel * ROLL_PER_ACCEL, -MAX_LEAN, MAX_LEAN);
+      s.pitchVel += (SPRING * (targetPitch - s.pitch) - DAMPING * s.pitchVel) * dt;
+      s.pitch += s.pitchVel * dt;
+      s.rollVel += (SPRING * (targetRoll - s.roll) - DAMPING * s.rollVel) * dt;
+      s.roll += s.rollVel * dt;
+      wheels.body.rotation.x = s.pitch;
+      wheels.body.rotation.z = s.roll;
+
+      // where the rear tyres touch the ground, and how hard they are sliding (smoke + skid marks)
+      group.updateMatrixWorld();
+      fx.update(wheels.rearContact, group, sim, handbrake);
     }
 
     fillTelemetry(sim, handbrake);
@@ -176,9 +207,7 @@ export function Player({ carRef }: PlayerProps) {
 
   return (
     <group ref={carRef}>
-      <Suspense fallback={null}>
-        <CarModel url={spec.model} scale={spec.scale} color={color} onParts={onParts} />
-      </Suspense>
+      <CarModel spec={spec} color={color} onParts={onParts} />
     </group>
   );
 }
