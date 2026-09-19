@@ -312,7 +312,11 @@ export class VehicleSim {
 
     this.drifting = Math.abs(this.vLat) > 3.2 || (this.wheelspin && speed > 4);
     const gripLat = input.handbrake && speed > 2 ? 1.6 : this.drifting ? s.driftGrip : s.gripLat;
+    // Tyre grip turns sideways motion into forward motion instead of just deleting it; without this
+    // a slide bleeds all its speed and a drift dies in a second.
+    const latBefore = Math.abs(this.vLat);
     this.vLat *= Math.exp(-gripLat * dt);
+    this.vFwd += (this.vFwd < 0 ? -1 : 1) * (latBefore - Math.abs(this.vLat)) * 0.6;
 
     let wT = (-this.vFwd * Math.tan(this.steer)) / s.wheelbase;
     if (this.drifting || (input.handbrake && speed > 2)) wT *= 1.35;

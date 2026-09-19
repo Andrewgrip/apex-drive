@@ -1,29 +1,38 @@
-import { Camera, Pause, Settings as SettingsIcon, Volume2, VolumeX } from "lucide-react";
+import { Camera, Pause, RotateCcw, Settings as SettingsIcon, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CARS, type CarSpec } from "../../game/cars";
 import { keyLabel, type Action } from "../../game/input";
 import type { StringKey } from "../../game/i18n";
 import { useGame } from "../../game/store";
+import { DRIFT_DURATION, modeState, type ModeState } from "../../game/modes";
 import { telemetry, type Telemetry } from "../../game/telemetry";
-import { CITY_HALF, connectorSamples, trackSamples, WORLD_HALF } from "../../game/world";
+import { ARENA, CITY_HALF, connectorSamples, gates, HIGHWAY_END_X, HIGHWAY_START_X, trackSamples } from "../../game/world";
 import { useT } from "./useT";
 
-function useTelemetry(hz: number): Telemetry {
-  const [snap, setSnap] = useState<Telemetry>(() => ({ ...telemetry }));
+/** Re-renders the HUD at `hz` from a mutable per-frame source (telemetry / mode state). */
+function useLive<T extends object>(source: T, hz: number): T {
+  const [snap, setSnap] = useState<T>(() => ({ ...source }));
   useEffect(() => {
     let raf = 0;
     let last = 0;
     const loop = (now: number) => {
       if (now - last >= 1000 / hz) {
         last = now;
-        setSnap({ ...telemetry });
+        setSnap({ ...source });
       }
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [hz]);
+  }, [source, hz]);
   return snap;
+}
+
+function fmtTime(seconds: number): string {
+  if (seconds <= 0) return "--:--.---";
+  const m = Math.floor(seconds / 60);
+  const s = seconds - m * 60;
+  return `${String(m).padStart(2, "0")}:${s.toFixed(3).padStart(6, "0")}`;
 }
 
 // ---------- Analog gauge ----------
@@ -117,10 +126,11 @@ function Minimap() {
       ctx.rotate(telemetry.yaw - Math.PI);
       ctx.scale(MAP_SCALE, MAP_SCALE);
       ctx.translate(-telemetry.x, -telemetry.z);
-      ctx.fillStyle = "rgba(255,255,255,0.05)";
-      ctx.fillRect(-WORLD_HALF, -WORLD_HALF, WORLD_HALF * 2, WORLD_HALF * 2);
       ctx.fillStyle = "rgba(255,255,255,0.12)";
       ctx.fillRect(-CITY_HALF, -CITY_HALF, CITY_HALF * 2, CITY_HALF * 2);
+      ctx.beginPath();
+      ctx.arc(ARENA.x, ARENA.z, ARENA.r, 0, Math.PI * 2);
+      ctx.fill();
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
       ctx.strokeStyle = "rgba(255,138,50,0.95)";
@@ -133,6 +143,20 @@ function Minimap() {
       ctx.beginPath();
       connectorSamples.forEach((s, i) => (i === 0 ? ctx.moveTo(s.x, s.z) : ctx.lineTo(s.x, s.z)));
       ctx.stroke();
+      ctx.strokeStyle = "rgba(255,200,120,0.95)";
+      ctx.lineWidth = 15;
+      ctx.beginPath();
+      ctx.moveTo(HIGHWAY_START_X, 0);
+      ctx.lineTo(HIGHWAY_END_X, 0);
+      ctx.stroke();
+      if (modeState.mode === "timeTrial") {
+        gates.forEach((g, i) => {
+          ctx.fillStyle = i === modeState.nextGate ? "#ffffff" : "rgba(255,255,255,0.35)";
+          ctx.beginPath();
+          ctx.arc(g.x, g.z, i === modeState.nextGate ? 16 : 9, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
       ctx.restore();
       ctx.fillStyle = "#ffffff";
       ctx.strokeStyle = "rgba(0,0,0,0.6)";
@@ -220,9 +244,104 @@ function IconButton({ onClick, label, children }: { onClick: () => void; label: 
   );
 }
 
+function Stat({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className="flex flex-col items-center px-2">
+      <span className="font-display text-[0.55rem] tracking-[0.18em] text-muted-foreground">{label.toUpperCase()}</span>
+      <span className={`font-display text-lg tabular-nums ${accent ? "text-primary" : "text-foreground"}`}>{value}</span>
+    </div>
+  );
+}
+
+function ModePanel({ m }: { m: ModeState }) {
+  const t = useT();
+  if (m.mode === "freeRoam") return null;
+  return (
+    <div className="glass-soft flex items-center rounded-xl px-3 py-1.5">
+      {m.mode === "timeTrial" ? (
+        <>
+          <Stat label={t("lap")} value={String(m.lap)} />
+          <Stat label={t("time")} value={fmtTime(m.lapTime)} accent />
+          <Stat label={t("bestLap")} value={fmtTime(m.bestLap)} />
+          <Stat label={t("lastLap")} value={fmtTime(m.lastLap)} />
+          <Stat label={t("checkpoint")} value={`${m.nextGate === 0 ? gates.length : m.nextGate}/${gates.length}`} />
+        </>
+      ) : (
+        <>
+          <Stat label={t("score")} value={String(Math.round(m.score))} accent />
+          <Stat label={t("chain")} value={`${Math.round(m.chain)} ×${m.multiplier}`} />
+          <Stat label={t("timeLeft")} value={fmtTime(m.timeLeft).slice(0, 5)} />
+          <Stat label={t("bestScore")} value={String(Math.round(m.bestScore))} />
+        </>
+      )}
+    </div>
+  );
+}
+
+function ModeOverlays({ m }: { m: ModeState }) {
+  const t = useT();
+  const toast = m.toast;
+  const toastText =
+    toast === null
+      ? null
+      : toast.key === "newBest" || toast.key === "lapDone"
+        ? `${t(toast.key)} · ${fmtTime(toast.value)}`
+        : toast.key === "bank"
+          ? `${t("bank")} +${toast.value}`
+          : t("crash");
+  const countdown = Math.ceil(m.countdown);
+  return (
+    <>
+      {m.countdown > 0 && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <div className="text-sm uppercase tracking-[0.4em] text-muted-foreground">{t("getReady")}</div>
+          <div key={countdown} className="neon-text animate-float-in font-display text-8xl font-black">{countdown}</div>
+        </div>
+      )}
+      {toastText && (
+        <div
+          className={`absolute left-1/2 top-[28%] -translate-x-1/2 animate-float-in rounded-xl px-5 py-2 font-display text-lg tracking-widest backdrop-blur ${
+            toast?.key === "crash" ? "bg-destructive/40 text-destructive-foreground" : "bg-primary/25 text-primary"
+          }`}
+        >
+          {toastText}
+        </div>
+      )}
+      {m.mode === "drift" && m.finished && <DriftResult m={m} />}
+    </>
+  );
+}
+
+function DriftResult({ m }: { m: ModeState }) {
+  const t = useT();
+  const restart = useGame((s) => s.restart);
+  const setScreen = useGame((s) => s.setScreen);
+  const isBest = m.score > 0 && m.score >= m.bestScore;
+  return (
+    <div className="pointer-events-auto absolute inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="glass animate-float-in flex w-[min(90vw,24rem)] flex-col items-center gap-3 rounded-2xl p-6">
+        <h2 className="neon-text text-3xl font-black tracking-[0.2em]">{t("timesUp")}</h2>
+        <div className="text-xs uppercase tracking-[0.3em] text-muted-foreground">{t("finalScore")}</div>
+        <div className="font-display text-5xl font-black tabular-nums">{Math.round(m.score)}</div>
+        {isBest && <div className="font-display text-sm tracking-widest text-primary">{t("newRecord")}</div>}
+        <div className="text-sm text-muted-foreground">
+          {t("bestScore")}: {Math.round(m.bestScore)} · {DRIFT_DURATION}s
+        </div>
+        <button type="button" className="btn-neon mt-2 w-full px-4 py-3 text-sm" onClick={restart}>
+          <RotateCcw size={16} /> {t("restart")}
+        </button>
+        <button type="button" className="btn-ghost w-full px-4 py-3 text-sm" onClick={() => setScreen("menu")}>
+          {t("quit")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function Hud() {
   const t = useT();
-  const tel = useTelemetry(30);
+  const tel = useLive(telemetry, 30);
+  const modeSnap = useLive(modeState, 15);
   const settings = useGame((s) => s.settings);
   const setScreen = useGame((s) => s.setScreen);
   const setSetting = useGame((s) => s.setSetting);
@@ -262,7 +381,10 @@ export function Hud() {
         </div>
       </div>
 
-      <div className="absolute left-1/2 top-6 flex -translate-x-1/2 flex-col items-center gap-2">
+      <ModeOverlays m={modeSnap} />
+
+      <div className="absolute left-1/2 top-4 flex -translate-x-1/2 flex-col items-center gap-2">
+        <ModePanel m={modeSnap} />
         {tel.stalled && (
           <div className="animate-shake rounded-xl border border-destructive/60 bg-destructive/25 px-5 py-2 text-center backdrop-blur">
             <div className="font-display text-lg tracking-widest text-destructive-foreground">{t("stalled")}</div>

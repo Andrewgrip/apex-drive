@@ -3,6 +3,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import type { CarId } from "./cars";
 import { DEFAULT_BINDINGS, type Action, type Bindings } from "./input";
 import type { Lang } from "./i18n";
+import type { GameMode } from "./modes";
 import type { TransmissionMode } from "./vehicle";
 
 export type CameraMode = "chase" | "hood" | "cockpit";
@@ -43,10 +44,12 @@ const defaultSettings: Settings = {
 
 interface GameState {
   screen: Screen;
+  mode: GameMode;
   settingsOpen: boolean;
   restartToken: number;
   settings: Settings;
   setScreen: (s: Screen) => void;
+  startMode: (mode: GameMode) => void;
   setSettingsOpen: (open: boolean) => void;
   setSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   setBinding: (action: Action, code: string) => void;
@@ -60,10 +63,12 @@ export const useGame = create<GameState>()(
   persist(
     (set, get) => ({
       screen: "menu",
+      mode: "freeRoam",
       settingsOpen: false,
       restartToken: 0,
       settings: defaultSettings,
       setScreen: (screen) => set({ screen }),
+      startMode: (mode) => set({ mode, restartToken: get().restartToken + 1, screen: "playing", settingsOpen: false }),
       setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
       setSetting: (key, value) => set({ settings: { ...get().settings, [key]: value } }),
       setBinding: (action, code) => {

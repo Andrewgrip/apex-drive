@@ -1,7 +1,11 @@
 import * as THREE from "three";
 
-export const WORLD_HALF = 300;
+/** The terrain is procedural and endless; this is only a sanity limit for the physics. */
+export const WORLD_BOUND = 1_000_000;
 export const CITY_HALF = 100;
+
+/** Flat paved skid pad used by the Drift Challenge. */
+export const ARENA = { x: 0, z: 820, r: 150 };
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const smoothstep = (e0: number, e1: number, x: number) => {
@@ -17,7 +21,10 @@ export function terrainHeight(x: number, z: number): number {
     3.2 * Math.sin((x + z) * 0.031 + 1.3) +
     1.6 * Math.sin(x * 0.05 - z * 0.043) +
     0.6 * Math.sin(x * 0.11 + z * 0.09);
-  return (h + 4) * mask;
+  // flatten the terrain along the speedway (z ~ 0, x > 232) and inside the drift arena
+  const corridor = 1 - (1 - smoothstep(14, 90, Math.abs(z))) * smoothstep(232, 330, x);
+  const arena = smoothstep(ARENA.r + 10, ARENA.r + 90, Math.hypot(x - ARENA.x, z - ARENA.z));
+  return (h + 4) * mask * corridor * arena;
 }
 
 export function mulberry32(seed: number) {
@@ -103,21 +110,25 @@ export function buildRoadGeometry(
   const kerbRed = new THREE.Color("#c8352b");
   const kerbWhite = new THREE.Color("#ececec");
   const kerbW = kerbs ? 1.0 : 0;
-  const offsets = [-halfWidth - kerbW, -halfWidth, -0.15, 0.15, halfWidth, halfWidth + kerbW];
+  // Ten vertices per cross-section: the extra ones sit 1 cm apart so the kerb and the centre line
+  // stay crisp instead of fading into the asphalt (colours are interpolated between vertices).
+  const offsets = [-halfWidth - kerbW, -halfWidth, -halfWidth + 0.01, -0.16, -0.15, 0.15, 0.16, halfWidth - 0.01, halfWidth, halfWidth + kerbW];
+  const V = offsets.length;
   const n = samples.length;
   for (let i = 0; i < n; i++) {
     const s = samples[i];
     const nx = -s.tz;
     const nz = s.tx;
     const kerbCol = Math.floor(i / 5) % 2 === 0 ? kerbRed : kerbWhite;
-    const lineOn = i % 10 < 5;
+    const lineCol = i % 10 < 5 ? line : i % 2 === 0 ? asphalt : asphaltLight;
     const asp = i % 2 === 0 ? asphalt : asphaltLight;
-    const cols = [kerbCol, kerbCol, asp, lineOn ? line : asp, asp, kerbCol];
-    for (let k = 0; k < 6; k++) {
+    const cols = [kerbCol, kerbCol, asp, asp, lineCol, lineCol, asp, asp, kerbCol, kerbCol];
+    for (let k = 0; k < V; k++) {
       const off = offsets[k];
       const x = s.x + nx * off;
       const z = s.z + nz * off;
-      const y = terrainHeight(x, z) + 0.08 + (k === 0 || k === 5 ? 0.04 : 0);
+      const isKerb = k <= 1 || k >= V - 2;
+      const y = terrainHeight(x, z) + 0.08 + (isKerb ? 0.04 : 0);
       positions.push(x, y, z);
       const c = cols[k];
       colors.push(c.r, c.g, c.b);
@@ -125,12 +136,13 @@ export function buildRoadGeometry(
   }
   const segs = closed ? n : n - 1;
   for (let i = 0; i < segs; i++) {
-    const a = i * 6;
-    const b = ((i + 1) % n) * 6;
-    for (let k = 0; k < 5; k++) {
-      if (!kerbs && (k === 0 || k === 4)) continue;
-      indices.push(a + k, b + k, a + k + 1);
-      indices.push(a + k + 1, b + k, b + k + 1);
+    const a = i * V;
+    const b = ((i + 1) % n) * V;
+    for (let k = 0; k < V - 1; k++) {
+      if (!kerbs && (k === 0 || k === V - 2)) continue;
+      // counter-clockwise seen from above, so the surface (and its normal) faces up
+      indices.push(a + k, a + k + 1, b + k);
+      indices.push(a + k + 1, b + k + 1, b + k);
     }
   }
   const g = new THREE.BufferGeometry();
@@ -151,11 +163,51 @@ export function distanceToTrack(x: number, z: number): number {
   return Math.sqrt(best);
 }
 
-export const SPAWN = {
-  x: trackSamples[0].x,
-  z: trackSamples[0].z,
-  yaw: Math.atan2(trackSamples[0].tx, trackSamples[0].tz),
-};
+// ---------- Speedway: a 10 km straight, long enough to reach top speed ----------
+
+export const HIGHWAY_START_X = trackSamples[0].x + 14;
+export const HIGHWAY_END_X = 10500;
+export const HIGHWAY_HALF_WIDTH = 9;
+export const highwaySamples = straightSamples(
+  HIGHWAY_START_X,
+  0,
+  HIGHWAY_END_X,
+  0,
+  Math.round((HIGHWAY_END_X - HIGHWAY_START_X) / 4),
+);
+
+// ---------- Time-trial gates on the circuit ----------
+
+export interface Gate {
+  x: number;
+  z: number;
+  tx: number;
+  tz: number;
+  yaw: number;
+}
+
+export const GATE_COUNT = 8;
+const TT_START_BEHIND = 4; // samples before the finish line
+const gateSample = (i: number): RoadSample => trackSamples[(i * (trackSamples.length / GATE_COUNT)) % trackSamples.length]!;
+/** gates[0] is the start/finish line; 1..7 are checkpoints in driving order. */
+export const gates: Gate[] = Array.from({ length: GATE_COUNT }, (_, i) => {
+  const s = gateSample(i);
+  return { x: s.x, z: s.z, tx: s.tx, tz: s.tz, yaw: Math.atan2(s.tx, s.tz) };
+});
+
+const ttStart = trackSamples[trackSamples.length - TT_START_BEHIND]!;
+
+export interface SpawnPoint {
+  x: number;
+  z: number;
+  yaw: number;
+}
+
+export const SPAWNS = {
+  freeRoam: { x: HIGHWAY_START_X + 30, z: 0, yaw: Math.PI / 2 },
+  timeTrial: { x: ttStart.x, z: ttStart.z, yaw: Math.atan2(ttStart.tx, ttStart.tz) },
+  drift: { x: ARENA.x - 100, z: ARENA.z, yaw: Math.PI / 2 },
+} satisfies Record<string, SpawnPoint>;
 
 // ---------- City ----------
 
@@ -237,20 +289,23 @@ export interface TreeInstance {
   hue: number;
 }
 
-function makeTrees(): TreeInstance[] {
-  const rand = mulberry32(42);
-  const trees: TreeInstance[] = [];
-  let tries = 0;
-  while (trees.length < 700 && tries < 6000) {
-    tries++;
-    const x = (rand() * 2 - 1) * (WORLD_HALF - 10);
-    const z = (rand() * 2 - 1) * (WORLD_HALF - 10);
-    if (Math.max(Math.abs(x), Math.abs(z)) < CITY_HALF + 12) continue;
-    if (distanceToTrack(x, z) < 13) continue;
-    if (Math.abs(z) < 9 && x > CITY_HALF - 5 && x < trackSamples[0].x + 5) continue;
-    trees.push({ x, z, y: terrainHeight(x, z), scale: 0.8 + rand() * 0.9, hue: rand() });
-  }
-  return trees;
+export const TREE_CELL = 42;
+
+function isTreeExcluded(x: number, z: number): boolean {
+  const cheb = Math.max(Math.abs(x), Math.abs(z));
+  if (cheb < CITY_HALF + 12) return true;
+  if (cheb < 330 && distanceToTrack(x, z) < 13) return true;
+  if (x > CITY_HALF - 5 && Math.abs(z) < 24) return true; // connector + speedway
+  if (Math.hypot(x - ARENA.x, z - ARENA.z) < ARENA.r + 30) return true;
+  return false;
 }
 
-export const trees = makeTrees();
+/** Deterministic tree for a grid cell (or null), so the forest exists everywhere in the endless world. */
+export function treeForCell(ix: number, iz: number): TreeInstance | null {
+  const rand = mulberry32((Math.imul(ix, 73856093) ^ Math.imul(iz, 19349663) ^ 0x9e3779b9) >>> 0);
+  if (rand() > 0.6) return null;
+  const x = (ix + rand()) * TREE_CELL;
+  const z = (iz + rand()) * TREE_CELL;
+  if (isTreeExcluded(x, z)) return null;
+  return { x, z, y: terrainHeight(x, z), scale: 0.8 + rand() * 0.9, hue: rand() };
+}

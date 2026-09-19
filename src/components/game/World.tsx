@@ -3,64 +3,105 @@ import { Environment, Lightformer, Stars } from "@react-three/drei";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import {
+  ARENA,
   buildRoadGeometry,
   city,
   connectorSamples,
   CITY_HALF,
-  terrainHeight,
+  HIGHWAY_HALF_WIDTH,
+  highwaySamples,
   trackSamples,
-  trees,
-  WORLD_HALF,
+  TREE_CELL,
+  treeForCell,
 } from "../../game/world";
+import { TERRAIN_GLSL } from "../../game/terrainGlsl";
 import { environment, telemetry } from "../../game/telemetry";
 import { useGame } from "../../game/store";
 
 // ---------- Terrain ----------
+// One static grid that follows the car (snapped to the grid so it never swims). Heights and
+// colours are computed on the GPU from world coordinates, so the ground is endless and free.
+// 4 m cells: coarser cells let the terrain's straight-edged facets poke through the roads above it.
+const TERRAIN_HALF = 600;
+const TERRAIN_SEGMENTS = 300;
+const TERRAIN_CELL = (TERRAIN_HALF * 2) / TERRAIN_SEGMENTS;
+
 function Terrain() {
+  const mesh = useRef<THREE.Mesh>(null);
   const geometry = useMemo(() => {
-    const seg = 140;
-    const g = new THREE.PlaneGeometry(WORLD_HALF * 2, WORLD_HALF * 2, seg, seg);
+    const g = new THREE.PlaneGeometry(TERRAIN_HALF * 2, TERRAIN_HALF * 2, TERRAIN_SEGMENTS, TERRAIN_SEGMENTS);
     g.rotateX(-Math.PI / 2);
-    const pos = g.attributes.position as THREE.BufferAttribute;
-    const colors = new Float32Array(pos.count * 3);
-    const grassA = new THREE.Color("#5c8a3c");
-    const grassB = new THREE.Color("#7aa04a");
-    const dry = new THREE.Color("#9a9a5a");
-    const c = new THREE.Color();
-    for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i);
-      const z = pos.getZ(i);
-      const h = terrainHeight(x, z);
-      pos.setY(i, h);
-      const n = 0.5 + 0.5 * Math.sin(x * 0.13 + z * 0.07) * Math.cos(z * 0.11 - x * 0.05);
-      c.copy(grassA).lerp(grassB, n);
-      c.lerp(dry, Math.min(1, Math.max(0, (h - 8) / 10)) * 0.6);
-      colors[i * 3] = c.r;
-      colors[i * 3 + 1] = c.g;
-      colors[i * 3 + 2] = c.b;
-    }
-    g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-    g.computeVertexNormals();
+    g.setAttribute("color", new THREE.BufferAttribute(new Float32Array(g.getAttribute("position").count * 3).fill(1), 3));
     return g;
   }, []);
-  return (
-    <mesh geometry={geometry} receiveShadow>
-      <meshStandardMaterial vertexColors flatShading roughness={1} />
-    </mesh>
-  );
+  const material = useMemo(() => {
+    const m = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1 });
+    m.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader
+        .replace("#include <common>", `#include <common>\n${TERRAIN_GLSL}`)
+        .replace(
+          "#include <begin_vertex>",
+          `#include <begin_vertex>
+          vec2 groundXZ = (modelMatrix * vec4(transformed, 1.0)).xz;
+          float groundH = terrainH(groundXZ);
+          transformed.y = groundH;
+          vColor.rgb = terrainColor(groundXZ, groundH);`,
+        );
+    };
+    return m;
+  }, []);
+  useFrame(() => {
+    const m = mesh.current;
+    if (!m) return;
+    m.position.set(Math.round(telemetry.x / TERRAIN_CELL) * TERRAIN_CELL, 0, Math.round(telemetry.z / TERRAIN_CELL) * TERRAIN_CELL);
+  });
+  return <mesh ref={mesh} geometry={geometry} material={material} frustumCulled={false} receiveShadow />;
 }
 
 // ---------- Roads ----------
 function Roads() {
   const track = useMemo(() => buildRoadGeometry(trackSamples, 6, true, true), []);
   const connector = useMemo(() => buildRoadGeometry(connectorSamples, 5, false, false), []);
+  const highway = useMemo(() => buildRoadGeometry(highwaySamples, HIGHWAY_HALF_WIDTH, false, false), []);
+  // polygonOffset keeps distant road surfaces from z-fighting with the ground
+  const roadProps = { vertexColors: true, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 } as const;
   return (
     <group>
       <mesh geometry={track} receiveShadow>
-        <meshStandardMaterial vertexColors roughness={0.9} metalness={0} />
+        <meshStandardMaterial {...roadProps} metalness={0} />
       </mesh>
       <mesh geometry={connector} receiveShadow>
-        <meshStandardMaterial vertexColors roughness={0.9} />
+        <meshStandardMaterial {...roadProps} />
+      </mesh>
+      <mesh geometry={highway} receiveShadow frustumCulled={false}>
+        <meshStandardMaterial {...roadProps} />
+      </mesh>
+    </group>
+  );
+}
+
+// ---------- Drift arena ----------
+function Arena() {
+  const paint = { polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 } as const;
+  return (
+    <group position={[ARENA.x, 0.06, ARENA.z]} rotation-x={-Math.PI / 2}>
+      <mesh receiveShadow>
+        <circleGeometry args={[ARENA.r, 96]} />
+        <meshStandardMaterial color="#2b2d31" roughness={0.92} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
+      </mesh>
+      {[35, 75, 115].map((r) => (
+        <mesh key={r} position={[0, 0, 0.01]}>
+          <ringGeometry args={[r - 0.35, r + 0.35, 96]} />
+          <meshStandardMaterial color="#e8e2cf" roughness={0.8} {...paint} />
+        </mesh>
+      ))}
+      <mesh position={[0, 0, 0.01]}>
+        <circleGeometry args={[3, 24]} />
+        <meshStandardMaterial color="#ff7a1a" emissive="#ff7a1a" emissiveIntensity={0.5} {...paint} />
+      </mesh>
+      <mesh position={[0, 0, 0.5]}>
+        <ringGeometry args={[ARENA.r - 1, ARENA.r + 1, 96]} />
+        <meshStandardMaterial color="#c8352b" roughness={0.8} {...paint} />
       </mesh>
     </group>
   );
@@ -141,39 +182,65 @@ function City() {
 }
 
 // ---------- Trees ----------
+const TREE_WINDOW = 620; // trees are generated this far around the car
+const TREE_REFRESH = 60; // and regenerated after the car moves this far
+const MAX_TREES = 900;
+const treeMatrix = new THREE.Matrix4();
+const treeQuat = new THREE.Quaternion();
+const treeScale = new THREE.Vector3();
+const treePos = new THREE.Vector3();
+const treeColor = new THREE.Color();
+
 function Trees() {
   const trunk = useRef<THREE.InstancedMesh>(null);
   const leaves = useRef<THREE.InstancedMesh>(null);
-  useLayoutEffect(() => {
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const s = new THREE.Vector3();
-    const p = new THREE.Vector3();
-    const col = new THREE.Color();
-    trees.forEach((t, i) => {
-      const h = 2.2 * t.scale;
-      p.set(t.x, t.y + h / 2, t.z);
-      s.set(0.35 * t.scale, h, 0.35 * t.scale);
-      m.compose(p, q, s);
-      trunk.current!.setMatrixAt(i, m);
-      p.set(t.x, t.y + h + 2.4 * t.scale, t.z);
-      s.set(2.2 * t.scale, 5 * t.scale, 2.2 * t.scale);
-      m.compose(p, q, s);
-      leaves.current!.setMatrixAt(i, m);
-      col.setHSL(0.28 + t.hue * 0.08, 0.45, 0.28 + t.hue * 0.12);
-      leaves.current!.setColorAt(i, col);
-    });
-    trunk.current!.instanceMatrix.needsUpdate = true;
-    leaves.current!.instanceMatrix.needsUpdate = true;
-    if (leaves.current!.instanceColor) leaves.current!.instanceColor.needsUpdate = true;
-  }, []);
+  const center = useRef({ x: Number.NaN, z: Number.NaN });
+
+  useFrame(() => {
+    const tr = trunk.current;
+    const lv = leaves.current;
+    if (!tr || !lv) return;
+    const c = center.current;
+    if (Math.hypot(telemetry.x - c.x, telemetry.z - c.z) < TREE_REFRESH) return;
+    c.x = telemetry.x;
+    c.z = telemetry.z;
+    const x0 = Math.floor((c.x - TREE_WINDOW) / TREE_CELL);
+    const x1 = Math.floor((c.x + TREE_WINDOW) / TREE_CELL);
+    const z0 = Math.floor((c.z - TREE_WINDOW) / TREE_CELL);
+    const z1 = Math.floor((c.z + TREE_WINDOW) / TREE_CELL);
+    let n = 0;
+    for (let ix = x0; ix <= x1 && n < MAX_TREES; ix++) {
+      for (let iz = z0; iz <= z1 && n < MAX_TREES; iz++) {
+        const t = treeForCell(ix, iz);
+        if (!t) continue;
+        const h = 2.2 * t.scale;
+        treePos.set(t.x, t.y + h / 2, t.z);
+        treeScale.set(0.35 * t.scale, h, 0.35 * t.scale);
+        treeMatrix.compose(treePos, treeQuat, treeScale);
+        tr.setMatrixAt(n, treeMatrix);
+        treePos.set(t.x, t.y + h + 2.4 * t.scale, t.z);
+        treeScale.set(2.2 * t.scale, 5 * t.scale, 2.2 * t.scale);
+        treeMatrix.compose(treePos, treeQuat, treeScale);
+        lv.setMatrixAt(n, treeMatrix);
+        treeColor.setHSL(0.28 + t.hue * 0.08, 0.45, 0.28 + t.hue * 0.12);
+        lv.setColorAt(n, treeColor);
+        n++;
+      }
+    }
+    tr.count = n;
+    lv.count = n;
+    tr.instanceMatrix.needsUpdate = true;
+    lv.instanceMatrix.needsUpdate = true;
+    if (lv.instanceColor) lv.instanceColor.needsUpdate = true;
+  });
+
   return (
     <group>
-      <instancedMesh ref={trunk} args={[undefined, undefined, trees.length]} castShadow>
+      <instancedMesh ref={trunk} args={[undefined, undefined, MAX_TREES]} frustumCulled={false} castShadow>
         <cylinderGeometry args={[0.5, 0.7, 1, 6]} />
         <meshStandardMaterial color="#5a3d26" roughness={1} />
       </instancedMesh>
-      <instancedMesh ref={leaves} args={[undefined, undefined, trees.length]} castShadow>
+      <instancedMesh ref={leaves} args={[undefined, undefined, MAX_TREES]} frustumCulled={false} castShadow>
         <coneGeometry args={[1, 1, 7]} />
         <meshStandardMaterial roughness={1} flatShading />
       </instancedMesh>
@@ -192,6 +259,7 @@ function SkyAndSun() {
   const sun = useRef<THREE.DirectionalLight>(null);
   const hemi = useRef<THREE.HemisphereLight>(null);
   const fog = useRef<THREE.Fog>(null);
+  const stars = useRef<THREE.Group>(null);
   const dayCycle = useGame((s) => s.settings.dayCycle);
   const target = useMemo(() => new THREE.Object3D(), []);
   const [isNight, setNight] = useNightState();
@@ -209,6 +277,7 @@ function SkyAndSun() {
     (scene.background as THREE.Color | null)?.copy?.(tmpColor);
     if (!scene.background) scene.background = tmpColor.clone();
     if (fog.current) fog.current.color.copy(tmpColor);
+    stars.current?.position.set(telemetry.x, 0, telemetry.z);
     if (sun.current) {
       const r = 220;
       sun.current.position.set(
@@ -229,7 +298,7 @@ function SkyAndSun() {
   return (
     <>
       <primitive object={target} />
-      <fog ref={fog} attach="fog" args={["#8fc5ee", 90, 460]} />
+      <fog ref={fog} attach="fog" args={["#8fc5ee", 120, 560]} />
       <hemisphereLight ref={hemi} args={["#bfe1ff", "#4a5a2a", 0.8]} />
       <directionalLight
         ref={sun}
@@ -245,7 +314,7 @@ function SkyAndSun() {
         shadow-camera-far={600}
         shadow-bias={-0.0004}
       />
-      {isNight && <Stars radius={280} depth={40} count={1800} factor={4} fade speed={0.4} />}
+      <group ref={stars}>{isNight && <Stars radius={280} depth={40} count={1800} factor={4} fade speed={0.4} />}</group>
     </>
   );
 }
@@ -266,6 +335,7 @@ export function World() {
       </Environment>
       <Terrain />
       <Roads />
+      <Arena />
       <City />
       <Trees />
     </group>

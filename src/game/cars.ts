@@ -50,7 +50,7 @@ export const CARS: Record<CarId, CarSpec> = {
     maxSteer: 0.58,
     wheelbase: 2.5,
     defaultColor: "#ff7a1a",
-    stats: { topSpeed: 200, handling: 0.8, grip: 0.8, accel: 0.5 },
+    stats: { topSpeed: 165, handling: 0.8, grip: 0.8, accel: 0.5 },
   },
   coupe: {
     id: "coupe",
@@ -75,7 +75,7 @@ export const CARS: Record<CarId, CarSpec> = {
     maxSteer: 0.55,
     wheelbase: 2.6,
     defaultColor: "#2fa4ff",
-    stats: { topSpeed: 265, handling: 0.95, grip: 0.9, accel: 0.8 },
+    stats: { topSpeed: 250, handling: 0.95, grip: 0.9, accel: 0.8 },
   },
   muscle: {
     id: "muscle",

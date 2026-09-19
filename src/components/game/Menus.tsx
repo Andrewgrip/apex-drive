@@ -1,7 +1,8 @@
-import { Play, RotateCcw, Settings as SettingsIcon, LogOut } from "lucide-react";
+import { Flame, Play, RotateCcw, Settings as SettingsIcon, LogOut, Timer } from "lucide-react";
 import { useEffect } from "react";
 import { audio } from "../../game/audio";
 import { CARS, type CarId, type CarSpec } from "../../game/cars";
+import type { GameMode } from "../../game/modes";
 import { useGame } from "../../game/store";
 import type { TransmissionMode } from "../../game/vehicle";
 import { Seg } from "./SettingsPanel";
@@ -9,12 +10,12 @@ import { useT } from "./useT";
 
 const SWATCHES = ["#ff7a1a", "#e63946", "#2fa4ff", "#2ecc71", "#f4d03f", "#a06bff", "#d9d9d9", "#1f2430"];
 
-export function startDriving(): void {
-  const { settings, setScreen } = useGame.getState();
+export function startDriving(mode: GameMode): void {
+  const { settings, startMode } = useGame.getState();
   audio.cylinders = CARS[settings.carId].cylinders;
   audio.init();
   audio.resume();
-  setScreen("playing");
+  startMode(mode);
 }
 
 function StatBar({ label, value }: { label: string; value: number }) {
@@ -61,7 +62,7 @@ export function MainMenu() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (settingsOpen) return;
-      if (e.code === "Enter") startDriving();
+      if (e.code === "Enter") startDriving("freeRoam");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -91,17 +92,16 @@ export function MainMenu() {
 
       <div className="pointer-events-auto flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="glass animate-float-in flex w-full max-w-md flex-col gap-3 rounded-2xl p-4">
-          <button type="button" className="btn-neon px-6 py-3.5 text-base" onClick={startDriving}>
+          <button type="button" className="btn-neon px-6 py-3.5 text-base" onClick={() => startDriving("freeRoam")}>
             <Play size={18} /> {t("freeRoam")}
           </button>
+          <p className="-mt-1 text-center text-[0.65rem] tracking-wider text-muted-foreground">{t("freeRoamHint")}</p>
           <div className="grid grid-cols-2 gap-2">
-            <button type="button" disabled className="btn-ghost px-3 py-2.5 text-[0.7rem] opacity-50">
-              {t("timeTrial")}
-              <span className="text-[0.55rem] text-primary">{t("comingSoon")}</span>
+            <button type="button" className="btn-ghost flex-col px-3 py-2.5 text-[0.7rem]" onClick={() => startDriving("timeTrial")}>
+              <Timer size={16} /> {t("timeTrial")}
             </button>
-            <button type="button" disabled className="btn-ghost px-3 py-2.5 text-[0.7rem] opacity-50">
-              {t("driftChallenge")}
-              <span className="text-[0.55rem] text-primary">{t("comingSoon")}</span>
+            <button type="button" className="btn-ghost flex-col px-3 py-2.5 text-[0.7rem]" onClick={() => startDriving("drift")}>
+              <Flame size={16} /> {t("driftChallenge")}
             </button>
           </div>
           <div className="flex items-center justify-between gap-2">

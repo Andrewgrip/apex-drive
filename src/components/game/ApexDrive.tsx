@@ -6,6 +6,7 @@ import { audio } from "../../game/audio";
 import { input } from "../../game/input";
 import { useGame, type Quality } from "../../game/store";
 import { CameraRig } from "./CameraRig";
+import { Gates } from "./Gates";
 import { Hud } from "./Hud";
 import { MainMenu, PauseMenu } from "./Menus";
 import { Player } from "./Player";
@@ -82,6 +83,7 @@ export function ApexDrive() {
       >
         <Suspense fallback={null}>
           <World />
+          <Gates />
           <Player carRef={carRef} />
           <CameraRig carRef={carRef} menu={screen === "menu"} />
         </Suspense>

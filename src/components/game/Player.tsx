@@ -5,10 +5,11 @@ import * as THREE from "three";
 import { audio } from "../../game/audio";
 import { CARS } from "../../game/cars";
 import { input, type Action } from "../../game/input";
+import { modeState, resetMode, spawnFor, updateMode } from "../../game/modes";
 import { useGame } from "../../game/store";
 import { telemetry } from "../../game/telemetry";
 import { VehicleSim, type RawInput } from "../../game/vehicle";
-import { city, SPAWN, terrainHeight, WORLD_HALF } from "../../game/world";
+import { city, terrainHeight, WORLD_BOUND } from "../../game/world";
 import { CarModel, type CarParts } from "./CarModel";
 
 for (const car of Object.values(CARS)) useGLTF.preload(car.model);
@@ -68,9 +69,10 @@ export function Player({ carRef }: PlayerProps) {
   const color = useGame((s) => s.settings.carColor);
   const mode = useGame((s) => s.settings.transmission);
   const restartToken = useGame((s) => s.restartToken);
+  const gameMode = useGame((s) => s.mode);
   const spec = CARS[carId];
 
-  const sim = useMemo(() => new VehicleSim(spec, terrainHeight, city.colliders, WORLD_HALF - 4), [spec]);
+  const sim = useMemo(() => new VehicleSim(spec, terrainHeight, city.colliders, WORLD_BOUND), [spec]);
   const parts = useRef<CarParts | null>(null);
   const pedals = useRef({ fwd: 0, back: 0 });
   const onParts = useCallback((p: CarParts) => {
@@ -78,13 +80,15 @@ export function Player({ carRef }: PlayerProps) {
   }, []);
 
   useLayoutEffect(() => {
-    sim.reset(SPAWN.x, SPAWN.z, SPAWN.yaw, useGame.getState().settings.transmission);
+    const spawn = spawnFor(gameMode);
+    sim.reset(spawn.x, spawn.z, spawn.yaw, useGame.getState().settings.transmission);
+    resetMode(gameMode, spec.id);
     audio.cylinders = spec.cylinders;
     pedals.current.fwd = 0;
     pedals.current.back = 0;
     if (carRef.current) applyPose(carRef.current, sim);
     fillTelemetry(sim, false);
-  }, [sim, spec, restartToken, carRef]);
+  }, [sim, spec, restartToken, gameMode, carRef]);
 
   useLayoutEffect(() => {
     if (mode !== "manual") {
@@ -129,7 +133,8 @@ export function Player({ carRef }: PlayerProps) {
     const wantBack = input.held("brake") ? 1 : 0;
     p.fwd = approach(p.fwd, wantFwd, (wantFwd > p.fwd ? 5 : 9) * delta);
     p.back = approach(p.back, wantBack, (wantBack > p.back ? 6 : 10) * delta);
-    const handbrake = input.held("handbrake");
+    // Held on the handbrake during the countdown: the engine can rev, the car cannot move.
+    const handbrake = input.held("handbrake") || modeState.countdown > 0;
     const raw: RawInput = {
       fwd: p.fwd,
       back: p.back,
@@ -141,7 +146,10 @@ export function Player({ carRef }: PlayerProps) {
       selectGear,
     };
 
+    const prevX = sim.x;
+    const prevZ = sim.z;
     sim.step(delta, raw, { mode: settings.transmission, autoDownshift: settings.autoDownshift });
+    updateMode(spec.id, sim, sim.events, prevX, prevZ, Math.min(delta, 0.05));
 
     for (const event of sim.events) {
       if (event === "shift") audio.playShift();
