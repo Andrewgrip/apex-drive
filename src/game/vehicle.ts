@@ -23,6 +23,7 @@ export type SimEvent = "shift" | "grind" | "stall" | "start" | "deny" | "hit";
 
 const G = 9.81;
 const CG_HEIGHT = 0.52; // centre of gravity height (m), for weight transfer
+const DRIFT_SPEED_KEPT = 0.6; // share of the speed removed by sideways grip that is redirected forward
 const TWO_PI = Math.PI * 2;
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const smooth = (e0: number, e1: number, x: number) => {
@@ -328,11 +329,15 @@ export class VehicleSim {
 
     this.drifting = Math.abs(this.vLat) > 3.2 || (this.wheelspin && speed > 4);
     const gripLat = input.handbrake && speed > 2 ? 1.6 : this.drifting ? s.driftGrip : s.gripLat;
-    // Tyre grip turns sideways motion into forward motion instead of just deleting it; without this
-    // a slide bleeds all its speed and a drift dies in a second.
-    const latBefore = Math.abs(this.vLat);
+    // Tyre grip redirects sideways motion instead of just deleting it, otherwise a slide bleeds all
+    // its speed and a drift dies in a second. Only part of the speed grip removes is given back, and
+    // the total speed can never rise: |v| after <= |v| before, so weaving cannot pump energy in.
+    const speedBefore = Math.hypot(this.vFwd, this.vLat);
     this.vLat *= Math.exp(-gripLat * dt);
-    this.vFwd += (this.vFwd < 0 ? -1 : 1) * (latBefore - Math.abs(this.vLat)) * 0.6;
+    const speedDamped = Math.hypot(this.vFwd, this.vLat);
+    const speedKept = speedDamped + DRIFT_SPEED_KEPT * (speedBefore - speedDamped);
+    const fwdSq = speedKept * speedKept - this.vLat * this.vLat;
+    if (fwdSq > 0) this.vFwd = (this.vFwd < 0 ? -1 : 1) * Math.sqrt(fwdSq);
 
     let wT = (-this.vFwd * Math.tan(this.steer)) / s.wheelbase;
     if (this.drifting || (input.handbrake && speed > 2)) wT *= 1.35;
