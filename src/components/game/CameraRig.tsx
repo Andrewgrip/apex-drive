@@ -37,11 +37,19 @@ export function CameraRig({ carRef, menu }: { carRef: RefObject<THREE.Group | nu
   const lookState = useRef(new THREE.Vector3());
   const orbit = useRef(0);
   const first = useRef(true);
+  const prevCar = useRef(new THREE.Vector3());
+  const velocity = useRef(new THREE.Vector3());
 
   useFrame(({ camera }, delta) => {
     const cam = camera as THREE.PerspectiveCamera;
     const car = carRef.current;
     if (!car) return;
+    // car velocity, used to lead the follow camera: an exponential follow alone trails by v/rate metres
+    if (delta > 0 && !first.current) {
+      velocity.current.copy(car.position).sub(prevCar.current).divideScalar(delta);
+      if (velocity.current.length() > 140) velocity.current.set(0, 0, 0); // teleport (restart), not motion
+    }
+    prevCar.current.copy(car.position);
     // the field of view opens up with speed: the strongest cheap cue for "going fast"
     const boost = menu ? 0 : Math.min(MAX_FOV_BOOST, telemetry.speedKmh * FOV_PER_KMH);
     const targetFov = menu ? 45 : fov + boost;
@@ -81,8 +89,8 @@ export function CameraRig({ carRef, menu }: { carRef: RefObject<THREE.Group | nu
     _pos.copy(cfg.pos);
     _pos.z -= speedPull;
     _pos.y += speedPull * 0.25;
-    _pos.applyQuaternion(_q).add(car.position);
-    _look.copy(cfg.look).applyQuaternion(_q).add(car.position);
+    _pos.applyQuaternion(_q).add(car.position).addScaledVector(velocity.current, 1 / cfg.rate);
+    _look.copy(cfg.look).applyQuaternion(_q).add(car.position).addScaledVector(velocity.current, 1 / (cfg.rate + 4));
     const t = first.current ? 1 : 1 - Math.exp(-cfg.rate * delta);
     cam.position.lerp(_pos, t);
     lookState.current.lerp(_look, first.current ? 1 : 1 - Math.exp(-(cfg.rate + 4) * delta));

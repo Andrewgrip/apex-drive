@@ -90,7 +90,7 @@ const DESIGNS: Record<CarId, Design> = {
       { z: -0.1, w: 0.77, wt: 0.61, yb: 0.91, yt: 1.43, g: 1 },
       { z: 0.2, w: 0.77, wt: 0.62, yb: 0.9, yt: 1.36, g: 1 },
       { z: 0.6, w: 0.765, wt: 0.64, yb: 0.89, yt: 1.1, g: 1 },
-      { z: 0.82, w: 0.76, wt: 0.7, yb: 0.88, yt: 0.95, g: 0 },
+      { z: 0.82, w: 0.76, wt: 0.7, yb: 0.85, yt: 0.88, g: 0 },
     ],
     tireWidth: 0.19,
     wheelX: 0.755,
@@ -132,7 +132,7 @@ const DESIGNS: Record<CarId, Design> = {
       { z: -0.3, w: 0.855, wt: 0.63, yb: 0.83, yt: 1.2, g: 1 },
       { z: -0.15, w: 0.85, wt: 0.64, yb: 0.82, yt: 1.16, g: 1 },
       { z: 0.3, w: 0.84, wt: 0.68, yb: 0.8, yt: 0.98, g: 1 },
-      { z: 0.55, w: 0.82, wt: 0.74, yb: 0.78, yt: 0.84, g: 0 },
+      { z: 0.55, w: 0.82, wt: 0.74, yb: 0.75, yt: 0.78, g: 0 },
     ],
     tireWidth: 0.26,
     wheelX: 0.79,
@@ -176,7 +176,7 @@ const DESIGNS: Record<CarId, Design> = {
       { z: -0.55, w: 0.89, wt: 0.69, yb: 1.03, yt: 1.4, g: 0 },
       { z: -0.4, w: 0.88, wt: 0.7, yb: 1.02, yt: 1.36, g: 1 },
       { z: 0.05, w: 0.86, wt: 0.72, yb: 1.0, yt: 1.2, g: 1 },
-      { z: 0.35, w: 0.84, wt: 0.76, yb: 0.99, yt: 1.04, g: 0 },
+      { z: 0.35, w: 0.84, wt: 0.76, yb: 0.96, yt: 0.99, g: 0 },
     ],
     tireWidth: 0.28,
     wheelX: 0.82,
@@ -510,4 +510,5 @@ export function buildCar(id: CarId, spec: CarSpec, color: string): { group: THRE
     parts: { body, frontWheels: front, allWheels: all, steeringWheel, paint, head, tail, headPositions, rearContact },
   };
 }
+
 
