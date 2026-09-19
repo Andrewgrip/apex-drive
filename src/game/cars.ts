@@ -29,7 +29,7 @@ export interface CarSpec {
 export const CARS: Record<CarId, CarSpec> = {
   hatchback: {
     id: "hatchback",
-    model: "/models/hatchback.glb",
+    model: `${import.meta.env.BASE_URL}models/hatchback.glb`,
     scale: 2.0,
     mass: 1150,
     maxTorque: 185,
@@ -54,7 +54,7 @@ export const CARS: Record<CarId, CarSpec> = {
   },
   coupe: {
     id: "coupe",
-    model: "/models/coupe.glb",
+    model: `${import.meta.env.BASE_URL}models/coupe.glb`,
     scale: 2.0,
     mass: 1350,
     maxTorque: 340,
@@ -79,7 +79,7 @@ export const CARS: Record<CarId, CarSpec> = {
   },
   muscle: {
     id: "muscle",
-    model: "/models/muscle.glb",
+    model: `${import.meta.env.BASE_URL}models/muscle.glb`,
     scale: 2.0,
     mass: 1720,
     maxTorque: 560,

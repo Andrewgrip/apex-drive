@@ -35,7 +35,7 @@ export function CarModel({ url, scale, color, onParts }: Props) {
     if (body) {
       const apply = (m: THREE.Material) => {
         const mat = m as THREE.MeshStandardMaterial;
-        if (mat.color) mat.color.copy(tint).lerp(new THREE.Color("#ffffff"), 0.25);
+        if (mat.color) mat.color.copy(tint).lerp(new THREE.Color("#ffffff"), 0.08);
         mat.metalness = 0.35;
         mat.roughness = 0.45;
       };

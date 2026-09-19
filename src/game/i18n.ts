@@ -86,6 +86,14 @@ const en = {
   muscle: "Muscle Car",
   startHint: "Any key or tap to begin",
   version: "Free Roam preview build",
+  play: "Drive",
+  color: "Colour",
+  topSpeed: "Top speed",
+  handling: "Handling",
+  grip: "Grip",
+  accel: "Acceleration",
+  hintReverse: "Reverse / Neutral",
+  quickTransmission: "Gearbox",
 };
 
 const el: typeof en = {
@@ -174,6 +182,14 @@ const el: typeof en = {
   muscle: "Muscle Car",
   startHint: "Πάτησε πλήκτρο ή άγγιξε για έναρξη",
   version: "Δοκιμαστική έκδοση Free Roam",
+  play: "Οδήγηση",
+  color: "Χρώμα",
+  topSpeed: "Τελική ταχύτητα",
+  handling: "Χειρισμός",
+  grip: "Πρόσφυση",
+  accel: "Επιτάχυνση",
+  hintReverse: "Όπισθεν / Νεκρά",
+  quickTransmission: "Κιβώτιο",
 };
 
 export type StringKey = keyof typeof en;
