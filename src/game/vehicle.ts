@@ -30,7 +30,7 @@ const LAUNCH_END_SPEED = 19.5; // m/s (~70 km/h): the launch is over
 const LAUNCH_HOLD_GEAR_SPEED = 13; // m/s (~47 km/h): the gearbox stays in first during a launch
 const MAX_WHEELIE = 0.6; // rad (~34 deg)
 const WHEELIE_PER_ACCEL = 0.16; // rad of lift per m/s² above the car's threshold
-const WHEELIE_MAX_SPEED = 45; // m/s: aero and speed pin the nose down above this
+const WHEELIE_MAX_SPEED = 28; // m/s (~100 km/h): the nose is fully pinned down by here
 const WHEELIE_SPRING = 22;
 const WHEELIE_DAMPING = 5;
 const TWO_PI = Math.PI * 2;
@@ -136,8 +136,10 @@ export class VehicleSim {
   private updateWheelie(dt: number) {
     const s = this.spec;
     let target = 0;
-    if (s.wheelieAccel > 0 && this.throttle > 0.85 && this.vFwd > 0 && this.clutch > 0.6 && this.vFwd < WHEELIE_MAX_SPEED) {
-      target = clamp((this.accel - s.wheelieAccel) * WHEELIE_PER_ACCEL, 0, MAX_WHEELIE);
+    if (s.wheelieAccel > 0 && this.throttle > 0.85 && this.vFwd > 0 && this.clutch > 0.6) {
+      // fades out between ~70 and ~100 km/h: speed and airflow press the nose back down
+      const speedFade = clamp((WHEELIE_MAX_SPEED - this.vFwd) / 8, 0, 1);
+      target = clamp((this.accel - s.wheelieAccel) * WHEELIE_PER_ACCEL, 0, MAX_WHEELIE) * speedFade;
     }
     this.wheelieVel += (WHEELIE_SPRING * (target - this.wheelie) - WHEELIE_DAMPING * this.wheelieVel) * dt;
     this.wheelie = clamp(this.wheelie + this.wheelieVel * dt, 0, MAX_WHEELIE);
@@ -263,7 +265,9 @@ export class VehicleSim {
       if (this.gear >= 1 && this.shiftCooldown <= 0 && !holdingGear) {
         const up = s.idleRpm + (s.redline - s.idleRpm) * (0.42 + 0.55 * thr);
         const down = s.redline * 0.27;
-        if (this.rpm > up && this.gear < 6) this.beginShift(this.gear + 1, 0.25);
+        // shift on the speed the wheels actually turn at, not on revs the engine flares to while the tyres spin
+        const wheelRpm = ((Math.abs(this.vFwd) / s.wheelRadius) * this.ratio(this.gear) * s.finalDrive * 60) / TWO_PI;
+        if (this.rpm > up && wheelRpm > up * 0.8 && this.gear < 6) this.beginShift(this.gear + 1, 0.25);
         else if (this.gear > 1) {
           const lowerRpm = (this.rpm * this.ratio(this.gear - 1)) / this.ratio(this.gear);
           if (this.rpm < down) this.beginShift(this.gear - 1, 0.25);

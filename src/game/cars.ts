@@ -112,7 +112,7 @@ export const CARS: Record<CarId, CarSpec> = {
     wheelbase: 2.9,
     awd: false,
     launchRpm: 4200,
-    wheelieAccel: 9,
+    wheelieAccel: 5.5,
     defaultColor: "#d9d9d9",
     stats: { topSpeed: 300, handling: 0.6, grip: 0.9, accel: 1 },
     eye: [0.36, 1.16, -0.4],
