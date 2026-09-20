@@ -31,6 +31,10 @@ const LAUNCH_HOLD_GEAR_SPEED = 13; // m/s (~47 km/h): the gearbox stays in first
 const MAX_WHEELIE = 0.6; // rad (~34 deg)
 const WHEELIE_PER_ACCEL = 0.16; // rad of lift per m/s² above the car's threshold
 const WHEELIE_MAX_SPEED = 28; // m/s (~100 km/h): the nose is fully pinned down by here
+const WHEELIE_START_SPEED = 3; // m/s (~11 km/h): below this the car counts as a standing start
+const WHEELIE_LATCH = 0.3; // rad (~17 deg): above this a wheelie is "up" and the throttle can hold it
+const WHEELIE_HOLD = 0.45; // rad (~26 deg): the angle held at full throttle
+const WHEELIE_RELEASE_THROTTLE = 0.4; // below this throttle the held wheelie comes down
 const WHEELIE_SPRING = 22;
 const WHEELIE_DAMPING = 5;
 const TWO_PI = Math.PI * 2;
@@ -82,6 +86,10 @@ export class VehicleSim {
   /** front-wheel lift angle (rad), 0 = wheels on the ground */
   wheelie = 0;
   private wheelieVel = 0;
+  /** latched once a wheelie is up: it then stays until the throttle is released */
+  private wheelieHeld = false;
+  /** true only after a standing start with the throttle floored */
+  private wheelieEligible = false;
   /** launch control: armed by the driver, then staged (brake + throttle), then launching */
   launchArmed = false;
   /** 0 off, 1 armed, 2 staged (holding revs), 3 launching */
@@ -114,6 +122,8 @@ export class VehicleSim {
     this.latAccel = 0;
     this.wheelie = 0;
     this.wheelieVel = 0;
+    this.wheelieHeld = false;
+    this.wheelieEligible = false;
     this.launchArmed = false;
     this.launchPhase = 0;
     this.throttleCap = 1;
@@ -136,10 +146,29 @@ export class VehicleSim {
   private updateWheelie(dt: number) {
     const s = this.spec;
     let target = 0;
-    if (s.wheelieAccel > 0 && this.throttle > 0.85 && this.vFwd > 0 && this.clutch > 0.6) {
-      // fades out between ~70 and ~100 km/h: speed and airflow press the nose back down
+    const floored = this.throttle > 0.85;
+    // Only a standing start with the throttle floored can throw the nose up. Pulling away gently and
+    // flooring it later never does, however hard the car then accelerates.
+    if (floored && this.vFwd < WHEELIE_START_SPEED) this.wheelieEligible = true;
+    if (this.throttle < WHEELIE_RELEASE_THROTTLE || this.vFwd <= 0 || (!this.wheelieHeld && this.vFwd > WHEELIE_MAX_SPEED)) {
+      this.wheelieEligible = false;
+    }
+    const wantsLift = s.wheelieAccel > 0 && this.vFwd > 0 && (floored || (this.wheelieHeld && this.throttle > WHEELIE_RELEASE_THROTTLE));
+    if (!wantsLift) {
+      this.wheelieHeld = false; // throttle lifted (or stopped): the nose comes down
+    } else {
+      // a fresh wheelie only starts from a hard launch and fades out by ~100 km/h...
       const speedFade = clamp((WHEELIE_MAX_SPEED - this.vFwd) / 8, 0, 1);
-      target = clamp((this.accel - s.wheelieAccel) * WHEELIE_PER_ACCEL, 0, MAX_WHEELIE) * speedFade;
+      if (floored && this.wheelieEligible && this.clutch > 0.6) {
+        target = clamp((this.accel - s.wheelieAccel) * WHEELIE_PER_ACCEL, 0, MAX_WHEELIE) * speedFade;
+      }
+      // ...but once it is up, the throttle holds it through gear changes and at any speed: full throttle
+      // keeps the nose high, easing off lowers it, lifting off lets it down
+      if (this.wheelie > WHEELIE_LATCH) this.wheelieHeld = true;
+      if (this.wheelieHeld) {
+        const hold = WHEELIE_HOLD * clamp((this.throttle - WHEELIE_RELEASE_THROTTLE) / (1 - WHEELIE_RELEASE_THROTTLE), 0, 1);
+        target = Math.max(target, hold);
+      }
     }
     this.wheelieVel += (WHEELIE_SPRING * (target - this.wheelie) - WHEELIE_DAMPING * this.wheelieVel) * dt;
     this.wheelie = clamp(this.wheelie + this.wheelieVel * dt, 0, MAX_WHEELIE);
