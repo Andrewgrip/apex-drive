@@ -99,6 +99,11 @@ export function TouchControls() {
             CLU
           </HoldButton>
         )}
+        {mode !== "manual" && (
+          <TapButton action="launch" label={t("launchKey")} className="h-11 w-16 text-[0.6rem]">
+            LC
+          </TapButton>
+        )}
         {mode !== "automatic" && (
           <div className="flex gap-2">
             <TapButton action="shiftDown" label={t("shiftDown")} className="h-12 w-12">

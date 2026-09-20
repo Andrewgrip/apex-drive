@@ -43,10 +43,28 @@ function approach(value: number, target: number, maxDelta: number): number {
   return Math.max(target, value - maxDelta);
 }
 
+const X_AXIS = new THREE.Vector3(1, 0, 0);
+const baseQuat = new THREE.Quaternion();
+const wheelieQuat = new THREE.Quaternion();
+const liftedQuat = new THREE.Quaternion();
+const rearAxle = new THREE.Vector3();
+const axleShift = new THREE.Vector3();
+
 function applyPose(group: THREE.Group, sim: VehicleSim): void {
-  group.position.set(sim.x, sim.y, sim.z);
   euler.set(sim.pitch, sim.yaw, sim.roll);
-  group.quaternion.setFromEuler(euler);
+  baseQuat.setFromEuler(euler);
+  if (sim.wheelie < 0.001) {
+    group.position.set(sim.x, sim.y, sim.z);
+    group.quaternion.copy(baseQuat);
+    return;
+  }
+  // a wheelie pivots the whole car about the rear axle: the nose rises, the rear tyres stay planted
+  wheelieQuat.setFromAxisAngle(X_AXIS, -sim.wheelie);
+  liftedQuat.copy(baseQuat).multiply(wheelieQuat);
+  rearAxle.set(0, sim.spec.wheelRadius, -sim.spec.wheelbase / 2);
+  axleShift.copy(rearAxle).applyQuaternion(baseQuat).sub(rearAxle.clone().applyQuaternion(liftedQuat));
+  group.position.set(sim.x + axleShift.x, sim.y + axleShift.y, sim.z + axleShift.z);
+  group.quaternion.copy(liftedQuat);
 }
 
 function fillTelemetry(sim: VehicleSim, handbrake: boolean): void {
@@ -69,6 +87,9 @@ function fillTelemetry(sim: VehicleSim, handbrake: boolean): void {
   telemetry.z = sim.z;
   telemetry.yaw = sim.yaw;
   telemetry.driftAngle = sim.driftAngle;
+  telemetry.launch = sim.launchPhase;
+  telemetry.wheelie = sim.wheelie;
+  telemetry.launchRpm = sim.spec.launchRpm;
 }
 
 interface PlayerProps {
@@ -134,6 +155,7 @@ export function Player({ carRef }: PlayerProps) {
 
     if (input.pressed("camera")) state.cycleCamera();
     if (input.pressed("transmission")) state.cycleTransmission();
+    if (input.pressed("launch")) sim.toggleLaunch();
     if (input.pressed("mute")) state.setSetting("muted", !settings.muted);
     const shiftUp = input.pressed("shiftUp");
     const shiftDown = input.pressed("shiftDown");

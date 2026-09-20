@@ -11,6 +11,7 @@ export type Action =
   | "pause"
   | "mute"
   | "transmission"
+  | "launch"
   | "gearR"
   | "gearN"
   | "gear1"
@@ -35,6 +36,7 @@ export const DEFAULT_BINDINGS: Bindings = {
   pause: ["Escape", "KeyP"],
   mute: ["KeyM"],
   transmission: ["KeyT"],
+  launch: ["KeyL"],
   gearR: ["KeyR"],
   gearN: ["KeyN", "Digit0"],
   gear1: ["Digit1"],
@@ -56,6 +58,7 @@ export const REBINDABLE: Action[] = [
   "shiftDown",
   "camera",
   "transmission",
+  "launch",
   "mute",
   "gearR",
   "gearN",

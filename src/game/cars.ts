@@ -22,6 +22,10 @@ export interface CarSpec {
   wheelbase: number;
   /** all-wheel drive: every wheel puts power down, so launches are not limited by rear-axle grip */
   awd: boolean;
+  /** engine speed (rpm) the launch control holds while the car is staged on the brake */
+  launchRpm: number;
+  /** longitudinal acceleration (m/s²) above which the front wheels lift off; 0 = the car never wheelies */
+  wheelieAccel: number;
   defaultColor: string;
   stats: { topSpeed: number; handling: number; grip: number; accel: number };
   /** driver's eye position and bonnet-camera position, in car space (left-hand drive: driver at +x) */
@@ -51,6 +55,8 @@ export const CARS: Record<CarId, CarSpec> = {
     maxSteer: 0.58,
     wheelbase: 2.5,
     awd: false,
+    launchRpm: 4300,
+    wheelieAccel: 0,
     defaultColor: "#ff7a1a",
     stats: { topSpeed: 195, handling: 0.8, grip: 0.7, accel: 0.55 },
     eye: [0.34, 1.22, -0.15],
@@ -77,6 +83,8 @@ export const CARS: Record<CarId, CarSpec> = {
     maxSteer: 0.55,
     wheelbase: 2.6,
     awd: false,
+    launchRpm: 4700,
+    wheelieAccel: 0,
     defaultColor: "#2fa4ff",
     stats: { topSpeed: 295, handling: 0.95, grip: 0.95, accel: 0.95 },
     eye: [0.36, 1.02, -0.35],
@@ -85,7 +93,7 @@ export const CARS: Record<CarId, CarSpec> = {
   muscle: {
     id: "muscle",
     mass: 1720,
-    maxTorque: 800,
+    maxTorque: 1500,
     idleRpm: 750,
     redline: 6200,
     maxRpm: 6700,
@@ -95,16 +103,18 @@ export const CARS: Record<CarId, CarSpec> = {
     finalDrive: 3.55,
     wheelRadius: 0.35,
     engineInertia: 0.28,
-    drag: 0.60,
+    drag: 1.14,
     brakeForce: 15500,
-    grip: 1.2,
+    grip: 1.85,
     gripLat: 7.5,
     driftGrip: 2.6,
     maxSteer: 0.52,
     wheelbase: 2.9,
     awd: false,
+    launchRpm: 4200,
+    wheelieAccel: 9,
     defaultColor: "#d9d9d9",
-    stats: { topSpeed: 290, handling: 0.6, grip: 0.8, accel: 0.85 },
+    stats: { topSpeed: 300, handling: 0.6, grip: 0.9, accel: 1 },
     eye: [0.36, 1.16, -0.4],
     hoodCam: [0, 1.42, 1.0],
   },
@@ -123,14 +133,16 @@ export const CARS: Record<CarId, CarSpec> = {
     engineInertia: 0.22,
     drag: 0.36,
     brakeForce: 26000,
-    grip: 1.45,
+    grip: 1.25,
     gripLat: 12,
     driftGrip: 4.2,
     maxSteer: 0.5,
     wheelbase: 2.75,
     awd: true,
+    launchRpm: 5600,
+    wheelieAccel: 0,
     defaultColor: "#f4c20d",
-    stats: { topSpeed: 400, handling: 0.95, grip: 1, accel: 1 },
+    stats: { topSpeed: 400, handling: 0.95, grip: 1, accel: 0.93 },
     eye: [0.34, 0.98, -0.25],
     hoodCam: [0, 0.98, 1.2],
   },};

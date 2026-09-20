@@ -213,6 +213,7 @@ function ControlsHint({ mode }: { mode: "automatic" | "semi" | "manual" }) {
         {mode !== "automatic" && <Chip keys={`${keyFor(bindings, "gearR")} · ${keyFor(bindings, "gearN")} · 1-6`} label={t("hintGears")} />}
         <Chip keys={keyFor(bindings, "camera")} label={t("hintCamera")} />
         <Chip keys={keyFor(bindings, "transmission")} label={t("hintTransmission")} />
+        {mode !== "manual" && <Chip keys={keyFor(bindings, "launch")} label={t("hintLaunch")} />}
         <Chip keys={bindings.pause.slice(0, 1).map(keyLabel).join("")} label={t("hintPause")} />
       </div>
     </div>
@@ -338,6 +339,36 @@ function DriftResult({ m }: { m: ModeState }) {
   );
 }
 
+/** launch-control prompts and the wheelie call-out, with a rev bar that fills to the launch rpm */
+function LaunchBanner({ tel, manual }: { tel: Telemetry; manual: boolean }) {
+  const t = useT();
+  const wheelie = tel.wheelie >= 0.15;
+  if (tel.launch === 0 && !wheelie) return null;
+  const staged = tel.launch === 2;
+  const prompt =
+    tel.launch === 3 ? t("launchGo") : staged ? t("launchStaged") : tel.launch === 1 ? (manual ? t("launchManual") : t("launchArmed")) : null;
+  const fill = tel.launchRpm > 0 ? Math.min(1, tel.rpm / tel.launchRpm) : 0;
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      {prompt && (
+        <div
+          className={`rounded-xl px-4 py-1.5 text-center font-display text-sm tracking-widest backdrop-blur ${
+            staged ? "animate-pulse-glow bg-primary/30 text-primary" : "bg-secondary/70 text-foreground"
+          }`}
+        >
+          {prompt}
+        </div>
+      )}
+      {staged && (
+        <div className="h-2 w-56 overflow-hidden rounded-full border border-border bg-secondary/70">
+          <div className="h-full rounded-full bg-primary shadow-neon transition-[width] duration-75" style={{ width: `${Math.round(fill * 100)}%` }} />
+        </div>
+      )}
+      {wheelie && <div className="font-display text-xl font-black tracking-[0.25em] text-warning animate-pulse-glow">{t("wheelieLabel")}</div>}
+    </div>
+  );
+}
+
 export function Hud() {
   const t = useT();
   const tel = useLive(telemetry, 30);
@@ -385,6 +416,7 @@ export function Hud() {
 
       <div className="absolute left-1/2 top-48 flex -translate-x-1/2 flex-col items-center gap-2 sm:top-4">
         <ModePanel m={modeSnap} />
+        <LaunchBanner tel={tel} manual={manual} />
         {tel.stalled && (
           <div className="animate-shake rounded-xl border border-destructive/60 bg-destructive/25 px-5 py-2 text-center backdrop-blur">
             <div className="font-display text-lg tracking-widest text-destructive-foreground">{t("stalled")}</div>

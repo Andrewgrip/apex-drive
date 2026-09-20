@@ -115,6 +115,13 @@ const en = {
   grip: "Grip",
   accel: "Acceleration",
   hintReverse: "Reverse / Neutral",
+  launchKey: "Launch control",
+  hintLaunch: "Launch control",
+  launchArmed: "LAUNCH CONTROL: hold brake + throttle",
+  launchStaged: "RELEASE THE BRAKE!",
+  launchGo: "LAUNCH!",
+  launchManual: "Launch control needs Automatic or Semi-auto in 1st gear",
+  wheelieLabel: "WHEELIE!",
   quickTransmission: "Gearbox",
 };
 
@@ -233,6 +240,13 @@ const el: typeof en = {
   grip: "Πρόσφυση",
   accel: "Επιτάχυνση",
   hintReverse: "Όπισθεν / Νεκρά",
+  launchKey: "Launch control",
+  hintLaunch: "Launch control",
+  launchArmed: "LAUNCH CONTROL: κράτα φρένο + γκάζι",
+  launchStaged: "ΑΦΗΣΕ ΤΟ ΦΡΕΝΟ!",
+  launchGo: "ΕΚΚΙΝΗΣΗ!",
+  launchManual: "Το launch control θέλει Αυτόματο ή Ημιαυτόματο, σε 1η",
+  wheelieLabel: "ΣΟΥΖΑ!",
   quickTransmission: "Κιβώτιο",
 };
 

@@ -19,6 +19,7 @@ const ACTION_LABEL: Record<Action, StringKey> = {
   pause: "pauseKey",
   mute: "muteKey",
   transmission: "transmissionKey",
+  launch: "launchKey",
   gearR: "gearR",
   gearN: "gearN",
   gear1: "gear1",

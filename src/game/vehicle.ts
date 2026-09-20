@@ -24,6 +24,15 @@ export type SimEvent = "shift" | "grind" | "stall" | "start" | "deny" | "hit";
 const G = 9.81;
 const CG_HEIGHT = 0.52; // centre of gravity height (m), for weight transfer
 const DRIFT_SPEED_KEPT = 0.6; // share of the speed removed by sideways grip that is redirected forward
+const LAUNCH_TRACTION_USE = 0.985; // share of the tyre grip limit the launch control uses
+const LAUNCH_STAGE_MAX_SPEED = 2.5; // m/s: the car counts as stopped for staging (idle creep, pedal races)
+const LAUNCH_END_SPEED = 19.5; // m/s (~70 km/h): the launch is over
+const LAUNCH_HOLD_GEAR_SPEED = 13; // m/s (~47 km/h): the gearbox stays in first during a launch
+const MAX_WHEELIE = 0.6; // rad (~34 deg)
+const WHEELIE_PER_ACCEL = 0.16; // rad of lift per m/s² above the car's threshold
+const WHEELIE_MAX_SPEED = 45; // m/s: aero and speed pin the nose down above this
+const WHEELIE_SPRING = 22;
+const WHEELIE_DAMPING = 5;
 const TWO_PI = Math.PI * 2;
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const smooth = (e0: number, e1: number, x: number) => {
@@ -70,6 +79,14 @@ export class VehicleSim {
   latAccel = 0;
   wheelOmegaVisual = 0;
   events: SimEvent[] = [];
+  /** front-wheel lift angle (rad), 0 = wheels on the ground */
+  wheelie = 0;
+  private wheelieVel = 0;
+  /** launch control: armed by the driver, then staged (brake + throttle), then launching */
+  launchArmed = false;
+  /** 0 off, 1 armed, 2 staged (holding revs), 3 launching */
+  launchPhase = 0;
+  private throttleCap = 1;
 
   constructor(
     public spec: CarSpec,
@@ -95,14 +112,36 @@ export class VehicleSim {
     this.wheelspinT = 0;
     this.accel = 0;
     this.latAccel = 0;
+    this.wheelie = 0;
+    this.wheelieVel = 0;
+    this.launchArmed = false;
+    this.launchPhase = 0;
+    this.throttleCap = 1;
     this.events.length = 0;
     this.updatePose();
+  }
+
+  toggleLaunch() {
+    this.launchArmed = !this.launchArmed;
+    this.launchPhase = this.launchArmed ? 1 : 0;
   }
 
   ratio(g: number): number {
     if (g === -1) return -this.spec.reverseRatio;
     if (g > 0) return this.spec.gearRatios[g - 1];
     return 0;
+  }
+
+  /** Front-end lift: a hard launch in a powerful rear-drive car raises the nose on a damped spring. */
+  private updateWheelie(dt: number) {
+    const s = this.spec;
+    let target = 0;
+    if (s.wheelieAccel > 0 && this.throttle > 0.85 && this.vFwd > 0 && this.clutch > 0.6 && this.vFwd < WHEELIE_MAX_SPEED) {
+      target = clamp((this.accel - s.wheelieAccel) * WHEELIE_PER_ACCEL, 0, MAX_WHEELIE);
+    }
+    this.wheelieVel += (WHEELIE_SPRING * (target - this.wheelie) - WHEELIE_DAMPING * this.wheelieVel) * dt;
+    this.wheelie = clamp(this.wheelie + this.wheelieVel * dt, 0, MAX_WHEELIE);
+    if (this.wheelie === 0 && this.wheelieVel < 0) this.wheelieVel = 0;
   }
 
   private beginShift(target: number, time: number) {
@@ -120,12 +159,53 @@ export class VehicleSim {
       const k = 1 - Math.exp(-8 * dt);
       this.accel += ((this.vFwd - vBefore) / dt - this.accel) * k;
       this.latAccel += (-this.yawRate * this.vFwd - this.latAccel) * k;
+      this.updateWheelie(dt);
     }
     this.collide();
     this.updatePose();
     // visual wheel spin: wheelspin makes the driven wheels spin faster than the road speed
     const roadOmega = this.vFwd / this.spec.wheelRadius;
     this.wheelOmegaVisual = this.wheelspin ? roadOmega + Math.sign(this.ratio(this.gear) || 1) * 25 : roadOmega;
+  }
+
+  /**
+   * Launch control (automatic and semi-automatic only). Armed with a key: hold brake + throttle and the
+   * revs are held at the car's launch rpm with the drivetrain open; let go of the brake and the clutch
+   * closes at once and the traction is used to the limit without spinning the tyres.
+   */
+  private handleLaunch(thr: number, brk: number, mode: TransmissionMode) {
+    this.throttleCap = 1;
+    if (!this.launchArmed) {
+      this.launchPhase = 0;
+      return;
+    }
+    if (mode === "manual" || this.gear !== 1 || !this.engineOn) {
+      this.launchPhase = 1;
+      return;
+    }
+    const slow = Math.abs(this.vFwd) < LAUNCH_STAGE_MAX_SPEED;
+    if (this.launchPhase === 3) {
+      if (thr < 0.3 || this.vFwd > LAUNCH_END_SPEED) {
+        this.launchArmed = false;
+        this.launchPhase = 0;
+        return;
+      }
+      this.clutch = 1;
+      return;
+    }
+    if (slow && brk > 0.3 && thr > 0.6) {
+      this.launchPhase = 2;
+    } else if (this.launchPhase === 2 && brk < 0.1 && thr > 0.6) {
+      this.launchPhase = 3;
+      this.clutch = 1;
+      return;
+    } else if (this.launchPhase === 2 && (thr < 0.3 || !slow)) {
+      this.launchPhase = 1;
+    }
+    if (this.launchPhase === 2) {
+      this.clutch = 0;
+      this.throttleCap = clamp((this.spec.launchRpm - this.rpm) / 700, 0, 1);
+    }
   }
 
   private handleTransmission(dt: number, input: RawInput, opts: SimOptions) {
@@ -144,7 +224,8 @@ export class VehicleSim {
       } else {
         thr = input.fwd;
         brk = input.back;
-        if (stopped && input.back > 0.1 && input.fwd < 0.1 && this.gear >= 0 && this.shiftTimer <= 0) this.gear = -1;
+        // (not while launch control is armed: brake + throttle together is the launch staging, not reverse)
+        if (stopped && input.back > 0.1 && input.fwd < 0.1 && this.gear >= 0 && this.shiftTimer <= 0 && !this.launchArmed) this.gear = -1;
         if (this.gear === 0 && input.fwd > 0.1) this.gear = 1;
       }
     } else {
@@ -166,6 +247,7 @@ export class VehicleSim {
       const conv = clamp((this.rpm - s.idleRpm * 0.95) / 900, 0, 1);
       this.clutch = this.gear === 0 || this.shiftTimer > 0 ? 0 : conv;
     }
+    this.handleLaunch(thr, brk, mode);
 
     // Shifting
     this.shiftCooldown = Math.max(0, this.shiftCooldown - dt);
@@ -177,7 +259,8 @@ export class VehicleSim {
         this.shiftCooldown = 0.45;
       }
     } else if (mode === "automatic") {
-      if (this.gear >= 1 && this.shiftCooldown <= 0) {
+      const holdingGear = this.launchPhase === 3 && this.vFwd < LAUNCH_HOLD_GEAR_SPEED;
+      if (this.gear >= 1 && this.shiftCooldown <= 0 && !holdingGear) {
         const up = s.idleRpm + (s.redline - s.idleRpm) * (0.42 + 0.55 * thr);
         const down = s.redline * 0.27;
         if (this.rpm > up && this.gear < 6) this.beginShift(this.gear + 1, 0.25);
@@ -261,6 +344,7 @@ export class VehicleSim {
       thr = Math.max(thr, idleThr);
     }
     if (this.shiftTimer > 0 && opts.mode !== "manual") thr *= 0.15;
+    thr = Math.min(thr, this.throttleCap);
     this.limiter = false;
     if (this.rpm > s.redline) {
       thr = 0;
@@ -282,12 +366,20 @@ export class VehicleSim {
       const latUse = clamp(Math.abs(this.vLat) / 6, 0, 1);
       // Weight moves onto the driven rear axle under acceleration (h/L * a/g), so a hard launch
       // bites harder than a gentle one instead of using a fixed static weight share.
-      const rearShare = s.awd ? 0.95 : clamp(0.52 + (CG_HEIGHT / s.wheelbase) * (this.accel / G), 0.42, 0.78);
+      let rearShare = s.awd ? 0.95 : clamp(0.52 + (CG_HEIGHT / s.wheelbase) * (this.accel / G), 0.42, 0.78);
+      // with the front wheels in the air the whole weight is on the driven axle
+      if (this.wheelie > 0.05) rearShare = Math.min(1, rearShare + this.wheelie * 0.6);
       const Ftmax = s.grip * s.mass * G * rearShare * (1 - 0.5 * latUse);
       let F = (Tcl * ratio) / s.wheelRadius;
       if (Math.abs(F) > Ftmax) {
-        this.wheelspinT += dt;
-        F = Math.sign(F) * Ftmax * 0.92;
+        if (this.launchPhase === 3) {
+          // launch control meters the torque to just under the grip limit: no wheelspin, no wasted time
+          F = Math.sign(F) * Ftmax * LAUNCH_TRACTION_USE;
+          this.wheelspinT = 0;
+        } else {
+          this.wheelspinT += dt;
+          F = Math.sign(F) * Ftmax * 0.92;
+        }
         Tcl = (F * s.wheelRadius) / ratio;
       } else {
         this.wheelspinT = Math.max(0, this.wheelspinT - dt * 2);
@@ -324,7 +416,9 @@ export class VehicleSim {
     else this.vFwd -= Math.sign(this.vFwd) * dv;
 
     const speed = Math.abs(this.vFwd);
-    const steerTarget = (input.steer * s.maxSteer) / (1 + speed / 22);
+    // the front wheels barely steer while they are in the air
+    const steerGrip = 1 - clamp(this.wheelie / 0.2, 0, 1) * 0.85;
+    const steerTarget = (input.steer * s.maxSteer * steerGrip) / (1 + speed / 22);
     this.steer += (steerTarget - this.steer) * (1 - Math.exp(-9 * dt));
 
     this.drifting = Math.abs(this.vLat) > 3.2 || (this.wheelspin && speed > 4);

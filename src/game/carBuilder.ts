@@ -263,6 +263,9 @@ const sgnPow = (v: number, p: number): number => Math.sign(v) * Math.abs(v) ** p
 
 /** roof slope (rise over run) above which the top of the cabin counts as windscreen / rear glass */
 const STEEP_ROOF = 0.32;
+/** where the side windows start and stop on the cabin section (-1 bottom .. +1 top): a real window band, not a slit */
+const GLASS_LOWER_EDGE = -0.62;
+const GLASS_UPPER_EDGE = 0.7;
 
 interface LoftResult {
   geometry: THREE.BufferGeometry;
@@ -355,7 +358,7 @@ function loft(stations: Station[], samples: number, ring: number, squareness: nu
         // side windows are the mid band of the section; the top band is glass only where the roof line
         // is steep (windscreen / rear window), decided per section so the edges run in straight lines
         const steep = (slope[s]! + slope[s + 1]!) / 2 > STEEP_ROOF;
-        isGlass = g > 0.5 && v > -0.15 && (v < 0.55 || steep);
+        isGlass = g > 0.5 && v > GLASS_LOWER_EDGE && (v < GLASS_UPPER_EDGE || steep);
       }
       (isGlass ? glassIdx : paintIdx).push(a, a1, b, a1, b1, b);
     }
@@ -487,7 +490,7 @@ export function buildCar(id: CarId, spec: CarSpec, color: string): { group: THRE
   const R = spec.wheelRadius;
 
   const paint = new THREE.MeshPhysicalMaterial({ color, metalness: 0.4, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 1.2 });
-  const glassMat = new THREE.MeshPhysicalMaterial({ color: "#04070b", metalness: 0.9, roughness: 0.05, envMapIntensity: 1.5 });
+  const glassMat = new THREE.MeshPhysicalMaterial({ color: "#0a141c", metalness: 0.75, roughness: 0.05, envMapIntensity: 2 });
   const housing = new THREE.MeshStandardMaterial({ color: "#07080a", roughness: 0.25, metalness: 0.6 });
   const trim = new THREE.MeshStandardMaterial({ color: "#101215", roughness: 0.55, metalness: 0.2 });
   const chrome = new THREE.MeshStandardMaterial({ color: "#d9dde3", roughness: 0.18, metalness: 1 });

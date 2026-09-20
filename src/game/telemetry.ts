@@ -22,6 +22,12 @@ export const telemetry = {
   yaw: 0,
   mode: "automatic" as TransmissionMode,
   driftAngle: 0,
+  /** launch control: 0 off, 1 armed, 2 staged, 3 launching */
+  launch: 0,
+  /** front-wheel lift angle in radians */
+  wheelie: 0,
+  /** engine speed the launch control holds while staged */
+  launchRpm: 0,
 };
 
 export type Telemetry = typeof telemetry;
