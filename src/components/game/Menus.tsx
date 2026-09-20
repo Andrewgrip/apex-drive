@@ -2,6 +2,7 @@ import { Flame, Play, RotateCcw, Settings as SettingsIcon, LogOut, Timer } from 
 import { useEffect } from "react";
 import { audio } from "../../game/audio";
 import { CARS, type CarId, type CarSpec } from "../../game/cars";
+import { CAR_SOURCES } from "../../game/carModels";
 import type { GameMode } from "../../game/modes";
 import { useGame } from "../../game/store";
 import type { TransmissionMode } from "../../game/vehicle";
@@ -129,6 +130,7 @@ export function MainMenu() {
               <CarCard key={id} spec={CARS[id]} selected={settings.carId === id} onSelect={() => pickCar(id)} />
             ))}
           </div>
+          {CAR_SOURCES[settings.carId].recolor && (
           <div className="mt-3 flex items-center gap-3">
             <span className="text-xs uppercase tracking-wider text-muted-foreground">{t("color")}</span>
             <div className="flex flex-wrap gap-2">
@@ -151,6 +153,10 @@ export function MainMenu() {
               />
             </div>
           </div>
+          )}
+          <p className="mt-3 text-[0.6rem] leading-snug tracking-wide text-muted-foreground">
+            Models: Neill Bogie (CC BY 4.0), Ferrari 458 by vicent091036 (via three.js examples).
+          </p>
         </div>
       </div>
     </div>

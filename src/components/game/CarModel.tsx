@@ -1,11 +1,14 @@
 import { useFrame } from "@react-three/fiber";
+import { useGLTF } from "@react-three/drei";
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
-import { buildCar, type CarParts } from "../../game/carBuilder";
 import type { CarSpec } from "../../game/cars";
+import { adaptCar, CAR_SOURCES, carRuntime, type CarParts } from "../../game/carModels";
 import { environment, telemetry } from "../../game/telemetry";
 
 export type { CarParts };
+
+for (const url of new Set(Object.values(CAR_SOURCES).map((s) => s.url))) useGLTF.preload(url, true);
 
 interface Props {
   spec: CarSpec;
@@ -17,9 +20,11 @@ interface Props {
 const BEAM_CANDELA = 45;
 
 export function CarModel({ spec, color, onParts }: Props) {
+  const source = CAR_SOURCES[spec.id];
+  const gltf = useGLTF(source.url, true);
   // the model is rebuilt only when the car changes; colour is applied by the effect below
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const built = useMemo(() => buildCar(spec.id, spec, color), [spec]);
+  const built = useMemo(() => adaptCar(spec, source, gltf.scene, color), [spec, source, gltf.scene]);
 
   const beams = useMemo(() => {
     return built.parts.headPositions.map((p) => {
@@ -32,29 +37,24 @@ export function CarModel({ spec, color, onParts }: Props) {
   }, [built]);
 
   useEffect(() => {
-    built.parts.paint.color.set(color);
+    built.parts.paint?.color.set(color);
   }, [built, color]);
 
   useEffect(() => {
+    carRuntime.view = built.view;
     onParts?.(built.parts);
   }, [built, onParts]);
 
   useEffect(() => {
-    return () => {
-      built.group.traverse((o) => {
-        const mesh = o as THREE.Mesh;
-        if (mesh.isMesh) mesh.geometry.dispose();
-      });
-      beams.forEach((b) => b.dispose());
-    };
-  }, [built, beams]);
+    return () => beams.forEach((b) => b.dispose());
+  }, [beams]);
 
   useFrame(() => {
     const night = THREE.MathUtils.clamp((0.12 - environment.sunElevation) * 6, 0, 1);
-    built.parts.head.emissiveIntensity = 0.25 + night * 2.4;
+    if (built.parts.head) built.parts.head.emissiveIntensity = night * 2.4;
     for (const b of beams) b.intensity = night * BEAM_CANDELA;
     const braking = telemetry.brake > 0.05 || telemetry.handbrake;
-    built.parts.tail.emissiveIntensity = braking ? 2.6 : 0.35 + night * 0.7;
+    if (built.parts.tail) built.parts.tail.emissiveIntensity = braking ? 2.6 : 0.2 + night * 0.7;
   });
 
   return <primitive object={built.group} />;

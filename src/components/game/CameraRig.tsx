@@ -2,6 +2,7 @@ import { useFrame } from "@react-three/fiber";
 import { useRef, type RefObject } from "react";
 import * as THREE from "three";
 import { CARS, type CarSpec } from "../../game/cars";
+import { carRuntime } from "../../game/carModels";
 import { useGame, type CameraMode } from "../../game/store";
 import { telemetry } from "../../game/telemetry";
 
@@ -13,11 +14,13 @@ interface Rig {
 
 function rigFor(mode: CameraMode, spec: CarSpec): Rig {
   if (mode === "chase") return { pos: new THREE.Vector3(0, 2.5, -6.8), look: new THREE.Vector3(0, 1.0, 6), rate: 5 };
+  // the interior cameras follow the model that is actually on screen; the spec numbers are a fallback
+  const view = carRuntime.view;
   if (mode === "hood") {
-    const [x, y, z] = spec.hoodCam;
+    const [x, y, z] = view ? view.hoodCam : spec.hoodCam;
     return { pos: new THREE.Vector3(x, y, z), look: new THREE.Vector3(x, y - 0.15, z + 30), rate: 22 };
   }
-  const [x, y, z] = spec.eye;
+  const [x, y, z] = view ? view.eye : spec.eye;
   return { pos: new THREE.Vector3(x, y, z), look: new THREE.Vector3(x, y - 0.08, z + 30), rate: 26 };
 }
 

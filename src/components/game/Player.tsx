@@ -1,5 +1,5 @@
 import { useFrame } from "@react-three/fiber";
-import { useCallback, useLayoutEffect, useMemo, useRef, type RefObject } from "react";
+import { Suspense, useCallback, useLayoutEffect, useMemo, useRef, type RefObject } from "react";
 import * as THREE from "three";
 import { audio } from "../../game/audio";
 import { CARS } from "../../game/cars";
@@ -229,7 +229,9 @@ export function Player({ carRef }: PlayerProps) {
 
   return (
     <group ref={carRef}>
-      <CarModel spec={spec} color={color} onParts={onParts} />
+      <Suspense fallback={null}>
+        <CarModel spec={spec} color={color} onParts={onParts} />
+      </Suspense>
     </group>
   );
 }

@@ -1,0 +1,16 @@
+Car models used by Apex Drive
+=============================
+
+cars_big_set.glb  (hatchback, sports coupe and muscle car)
+  (c) 2020 Neill Bogie, licensed CC BY 4.0
+  https://creativecommons.org/licenses/by/4.0/
+  Source: https://github.com/nbogie/three-js-cars-3  (models/cars_big_set.glb)
+  Used as-is; each car is scaled and its wheels are driven separately in code.
+
+ferrari.glb  (hypercar)
+  Ferrari 458 Italia model by vicent091036 (Sketchfab), as distributed with the three.js examples.
+  https://sketchfab.com/models/57bf6cc56931426e87494f554df1dab6
+  Source file: https://github.com/mrdoob/three.js/blob/dev/examples/models/gltf/ferrari.glb
+  NOTE: the licence of this model could not be verified. It is used here in a
+  non-commercial hobby project with attribution; check the Sketchfab page before any
+  commercial use or redistribution.
