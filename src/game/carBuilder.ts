@@ -1,4 +1,4 @@
-﻿import * as THREE from "three";
+import * as THREE from "three";
 import type { CarId, CarSpec } from "./cars";
 
 /**
@@ -58,11 +58,15 @@ interface Design {
   frontZ: number;
   rearZ: number;
   exhaust: { x: number; y: number; z: number; r: number }[];
-  extra: "wing" | "scoop" | "spoilerLip";
+  extra: "wing" | "scoop" | "spoilerLip" | "hyper";
   dashZ: number;
   seatZ: number;
   /** roof height above the seats, to size the interior */
   roofY: number;
+  /** beltline height at the doors: where the dash and seats sit */
+  belt: number;
+  /** widest half-width of the body */
+  halfWidth: number;
 }
 
 const DESIGNS: Record<CarId, Design> = {
@@ -90,7 +94,7 @@ const DESIGNS: Record<CarId, Design> = {
       { z: -0.1, w: 0.77, wt: 0.61, yb: 0.91, yt: 1.43, g: 1 },
       { z: 0.2, w: 0.77, wt: 0.62, yb: 0.9, yt: 1.36, g: 1 },
       { z: 0.6, w: 0.765, wt: 0.64, yb: 0.89, yt: 1.1, g: 1 },
-      { z: 0.82, w: 0.76, wt: 0.7, yb: 0.85, yt: 0.88, g: 0 },
+      { z: 0.82, w: 0.76, wt: 0.7, yb: 0.85, yt: 0.88, g: 1 },
     ],
     tireWidth: 0.19,
     wheelX: 0.755,
@@ -107,6 +111,8 @@ const DESIGNS: Record<CarId, Design> = {
     dashZ: 0.42,
     seatZ: -0.25,
     roofY: 1.45,
+    belt: 0.91,
+    halfWidth: 0.85,
   },
   coupe: {
     lower: [
@@ -132,7 +138,7 @@ const DESIGNS: Record<CarId, Design> = {
       { z: -0.3, w: 0.855, wt: 0.63, yb: 0.83, yt: 1.2, g: 1 },
       { z: -0.15, w: 0.85, wt: 0.64, yb: 0.82, yt: 1.16, g: 1 },
       { z: 0.3, w: 0.84, wt: 0.68, yb: 0.8, yt: 0.98, g: 1 },
-      { z: 0.55, w: 0.82, wt: 0.74, yb: 0.75, yt: 0.78, g: 0 },
+      { z: 0.55, w: 0.82, wt: 0.74, yb: 0.75, yt: 0.78, g: 1 },
     ],
     tireWidth: 0.26,
     wheelX: 0.79,
@@ -152,6 +158,8 @@ const DESIGNS: Record<CarId, Design> = {
     dashZ: 0.08,
     seatZ: -0.55,
     roofY: 1.22,
+    belt: 0.88,
+    halfWidth: 0.94,
   },
   muscle: {
     lower: [
@@ -176,7 +184,7 @@ const DESIGNS: Record<CarId, Design> = {
       { z: -0.55, w: 0.89, wt: 0.69, yb: 1.03, yt: 1.4, g: 0 },
       { z: -0.4, w: 0.88, wt: 0.7, yb: 1.02, yt: 1.36, g: 1 },
       { z: 0.05, w: 0.86, wt: 0.72, yb: 1.0, yt: 1.2, g: 1 },
-      { z: 0.35, w: 0.84, wt: 0.76, yb: 0.96, yt: 0.99, g: 0 },
+      { z: 0.35, w: 0.84, wt: 0.76, yb: 0.96, yt: 0.99, g: 1 },
     ],
     tireWidth: 0.28,
     wheelX: 0.82,
@@ -196,6 +204,52 @@ const DESIGNS: Record<CarId, Design> = {
     dashZ: 0.08,
     seatZ: -0.6,
     roofY: 1.4,
+    belt: 1.02,
+    halfWidth: 0.965,
+  },
+  hypercar: {
+    lower: [
+      { z: -2.3, w: 0.7, yb: 0.4, yt: 0.78 },
+      { z: -2.22, w: 0.9, yb: 0.28, yt: 0.9 },
+      { z: -1.95, w: 0.99, yb: 0.2, yt: 1.0 },
+      { z: -1.4, w: 1.0, yb: 0.17, yt: 1.0 },
+      { z: -0.6, w: 1.0, yb: 0.16, yt: 0.9 },
+      { z: 0.2, w: 0.99, yb: 0.15, yt: 0.74 },
+      { z: 1.0, w: 0.98, yb: 0.14, yt: 0.62 },
+      { z: 1.7, w: 0.96, yb: 0.14, yt: 0.52 },
+      { z: 2.1, w: 0.86, yb: 0.16, yt: 0.44 },
+      { z: 2.28, w: 0.62, yb: 0.24, yt: 0.38 },
+    ].map((s) => ({ ...s, wt: s.w * 0.94 })),
+    cabin: [
+      { z: -1.7, w: 0.7, wt: 0.4, yb: 0.96, yt: 1.02, g: 0 },
+      { z: -1.3, w: 0.86, wt: 0.55, yb: 0.95, yt: 1.1, g: 0.4 },
+      { z: -0.8, w: 0.9, wt: 0.6, yb: 0.88, yt: 1.14, g: 1 },
+      { z: -0.3, w: 0.9, wt: 0.62, yb: 0.8, yt: 1.14, g: 1 },
+      { z: -0.16, w: 0.9, wt: 0.62, yb: 0.78, yt: 1.13, g: 0 },
+      { z: 0.1, w: 0.89, wt: 0.6, yb: 0.74, yt: 1.1, g: 1 },
+      { z: 0.6, w: 0.86, wt: 0.7, yb: 0.66, yt: 0.86, g: 1 },
+      { z: 0.95, w: 0.84, wt: 0.78, yb: 0.58, yt: 0.64, g: 1 },
+    ],
+    tireWidth: 0.33,
+    wheelX: 0.83,
+    head: { x: 0.62, y: 0.46, z: 2.08, sx: 0.4, sy: 0.06, sz: 0.12 },
+    tail: { x: 0, y: 0.95, z: -2.27, sx: 1.5, sy: 0.06, sz: 0.05 },
+    grille: { x: 0, y: 0.3, z: 2.2, sx: 0.9, sy: 0.08, sz: 0.06 },
+    intake: { x: 0.55, y: 0.28, z: 2.18, sx: 0.4, sy: 0.1, sz: 0.06 },
+    mirror: { x: 1.02, y: 0.8, z: 0.55, sx: 0.14, sy: 0.07, sz: 0.12 },
+    plateY: 0.42,
+    frontZ: 2.28,
+    rearZ: -2.28,
+    exhaust: [
+      { x: 0.3, y: 0.55, z: -2.28, r: 0.07 },
+      { x: -0.3, y: 0.55, z: -2.28, r: 0.07 },
+    ],
+    extra: "hyper",
+    dashZ: 0.5,
+    seatZ: -0.3,
+    roofY: 1.14,
+    belt: 0.72,
+    halfWidth: 1.0,
   },
 };
 
@@ -206,6 +260,9 @@ const catmull = (p0: number, p1: number, p2: number, p3: number, t: number): num
 };
 
 const sgnPow = (v: number, p: number): number => Math.sign(v) * Math.abs(v) ** p;
+
+/** roof slope (rise over run) above which the top of the cabin counts as windscreen / rear glass */
+const STEEP_ROOF = 0.32;
 
 interface LoftResult {
   geometry: THREE.BufferGeometry;
@@ -218,6 +275,8 @@ function loft(stations: Station[], samples: number, ring: number, squareness: nu
   const positions: number[] = [];
   const vMean: number[] = [];
   const gAt: number[] = [];
+  const sampleZ: number[] = [];
+  const sampleRoof: number[] = [];
   const pw = 2 / squareness;
 
   for (let s = 0; s < samples; s++) {
@@ -232,6 +291,8 @@ function loft(stations: Station[], samples: number, ring: number, squareness: nu
     const yb = c((st) => st.yb);
     const yt = c((st) => st.yt);
     const g = Math.min(1, Math.max(0, c((st) => st.g ?? 1)));
+    sampleZ.push(z);
+    sampleRoof.push(yt);
     for (let j = 0; j < ring; j++) {
       const th = (j / ring) * Math.PI * 2;
       const u = sgnPow(Math.cos(th), pw);
@@ -270,42 +331,41 @@ function loft(stations: Station[], samples: number, ring: number, squareness: nu
     gAt.push(0);
   }
 
-  const tris: number[][] = [];
+  const paintIdx: number[] = [];
+  const glassIdx: number[] = [];
+  // roof-line steepness per section, from the sampled roof heights
+  const slope: number[] = [];
+  for (let s = 0; s < samples; s++) {
+    const p = Math.max(s - 1, 0);
+    const q = Math.min(s + 1, samples - 1);
+    const dz = Math.abs(sampleZ[q]! - sampleZ[p]!) || 1;
+    slope.push(Math.abs(sampleRoof[q]! - sampleRoof[p]!) / dz);
+  }
+  // whole quads are classified, so window edges run straight along the sections instead of zig-zagging
   for (let s = 0; s < samples - 1; s++) {
     for (let j = 0; j < ring; j++) {
       const a = s * ring + j;
       const a1 = s * ring + ((j + 1) % ring);
       const b = (s + 1) * ring + j;
       const b1 = (s + 1) * ring + ((j + 1) % ring);
-      tris.push([a, a1, b], [a1, b1, b]);
+      let isGlass = false;
+      if (glass) {
+        const g = (gAt[a]! + gAt[a1]! + gAt[b]! + gAt[b1]!) / 4;
+        const v = (vMean[a]! + vMean[a1]! + vMean[b]! + vMean[b1]!) / 4;
+        // side windows are the mid band of the section; the top band is glass only where the roof line
+        // is steep (windscreen / rear window), decided per section so the edges run in straight lines
+        const steep = (slope[s]! + slope[s + 1]!) / 2 > STEEP_ROOF;
+        isGlass = g > 0.5 && v > -0.15 && (v < 0.55 || steep);
+      }
+      (isGlass ? glassIdx : paintIdx).push(a, a1, b, a1, b1, b);
     }
   }
   const lastBase = (samples - 1) * ring;
   for (let j = 0; j < ring; j++) {
-    tris.push([frontCentre, lastBase + j, lastBase + ((j + 1) % ring)]);
-    tris.push([rearCentre, ((j + 1) % ring), j]);
+    const j1 = (j + 1) % ring;
+    paintIdx.push(frontCentre, lastBase + j, lastBase + j1);
+    paintIdx.push(rearCentre, j1, j);
   }
-
-  const paintIdx: number[] = [];
-  const glassIdx: number[] = [];
-  const va = new THREE.Vector3();
-  const vb = new THREE.Vector3();
-  const vc = new THREE.Vector3();
-  const n = new THREE.Vector3();
-  for (const [a, b, c] of tris as [number, number, number][]) {
-    let isGlass = false;
-    if (glass) {
-      va.fromArray(positions, a * 3);
-      vb.fromArray(positions, b * 3);
-      vc.fromArray(positions, c * 3);
-      n.subVectors(vb, va).cross(vc.sub(va)).normalize();
-      const g = (gAt[a]! + gAt[b]! + gAt[c]!) / 3;
-      const v = (vMean[a]! + vMean[b]! + vMean[c]!) / 3;
-      isGlass = g > 0.55 && v > -0.15 && n.y < 0.86;
-    }
-    (isGlass ? glassIdx : paintIdx).push(a, b, c);
-  }
-
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setIndex([...paintIdx, ...glassIdx]);
@@ -313,6 +373,18 @@ function loft(stations: Station[], samples: number, ring: number, squareness: nu
   if (glassIdx.length > 0) geometry.addGroup(paintIdx.length, glassIdx.length, 1);
   geometry.computeVertexNormals();
   return { geometry };
+}
+
+/** half-width of the lower body at a given z (linear between stations), to place arches on the surface */
+function bodyHalfAt(d: Design, z: number): number {
+  const st = [...d.lower].sort((a, b) => a.z - b.z);
+  if (z <= st[0]!.z) return st[0]!.w;
+  for (let i = 0; i < st.length - 1; i++) {
+    const a = st[i]!;
+    const b = st[i + 1]!;
+    if (z <= b.z) return a.w + ((b.w - a.w) * (z - a.z)) / (b.z - a.z);
+  }
+  return st[st.length - 1]!.w;
 }
 
 function box(d: Detail, mat: THREE.Material): THREE.Mesh {
@@ -383,7 +455,7 @@ export function buildCar(id: CarId, spec: CarSpec, color: string): { group: THRE
   const head = new THREE.MeshStandardMaterial({ color: "#eef0f2", roughness: 0.15, metalness: 0.2, emissive: new THREE.Color("#fff1c7"), emissiveIntensity: 0.25 });
   const tail = new THREE.MeshStandardMaterial({ color: "#6b0808", roughness: 0.3, emissive: new THREE.Color("#ff1212"), emissiveIntensity: 0.35 });
   const tire = new THREE.MeshStandardMaterial({ color: "#0c0c0d", roughness: 0.92 });
-  const rimMat = new THREE.MeshStandardMaterial({ color: "#c9ced6", roughness: 0.22, metalness: 1 });
+  const rimMat = new THREE.MeshStandardMaterial({ color: "#e4e7ec", roughness: 0.3, metalness: 0.55 });
   const discMat = new THREE.MeshStandardMaterial({ color: "#7d8188", roughness: 0.4, metalness: 0.9 });
   const caliperMat = new THREE.MeshStandardMaterial({ color: "#c8202a", roughness: 0.4, metalness: 0.4 });
   const interior = new THREE.MeshStandardMaterial({ color: "#16181c", roughness: 0.8 });
@@ -439,13 +511,21 @@ export function buildCar(id: CarId, spec: CarSpec, color: string): { group: THRE
   body.add(box({ x: 0, y: 0.2, z: 0, sx: d.wheelX * 2 - 0.2, sy: 0.04, sz: (d.frontZ - d.rearZ) * 0.9 }, trim));
   // door seams and belt line
   both((s) => {
-    const seam = box({ x: s * (d.lower[4]!.w * 0.985), y: 0.6, z: d.seatZ + 0.3, sx: 0.012, sy: 0.5, sz: 0.012 }, trim);
+    const seam = box({ x: s * (d.halfWidth * 0.985), y: 0.6, z: d.seatZ + 0.3, sx: 0.012, sy: 0.5, sz: 0.012 }, trim);
     return seam;
   });
   // bodystyle extras
   if (d.extra === "wing") {
     body.add(box({ x: 0, y: 1.08, z: -2.02, sx: 1.55, sy: 0.035, sz: 0.3 }, paint));
     both((s) => box({ x: s * 0.5, y: 1.0, z: -2.02, sx: 0.05, sy: 0.12, sz: 0.05 }, trim));
+  } else if (d.extra === "hyper") {
+    // large rear wing on swan-neck struts, diffuser, front splitter and rear-haunch air intakes
+    body.add(box({ x: 0, y: 1.2, z: -2.08, sx: 1.9, sy: 0.04, sz: 0.36 }, paint));
+    both((s) => box({ x: s * 0.46, y: 1.06, z: -2.06, sx: 0.05, sy: 0.3, sz: 0.07 }, trim));
+    both((s) => box({ x: s * 0.95, y: 1.22, z: -2.08, sx: 0.03, sy: 0.16, sz: 0.36 }, trim));
+    body.add(box({ x: 0, y: 0.24, z: -2.1, sx: 1.4, sy: 0.06, sz: 0.5 }, trim));
+    body.add(box({ x: 0, y: 0.15, z: 2.1, sx: 1.5, sy: 0.025, sz: 0.3 }, trim));
+    both((s) => box({ x: s * 1.0, y: 0.7, z: -1.05, sx: 0.04, sy: 0.22, sz: 0.55 }, trim));
   } else if (d.extra === "scoop") {
     body.add(box({ x: 0, y: 1.02, z: 1.0, sx: 0.52, sy: 0.1, sz: 0.75 }, paint));
     body.add(box({ x: 0, y: 1.0, z: 1.38, sx: 0.4, sy: 0.05, sz: 0.02 }, trim));
@@ -455,8 +535,8 @@ export function buildCar(id: CarId, spec: CarSpec, color: string): { group: THRE
   }
 
   // ----- interior (visible from the cockpit and hood cameras) -----
-  body.add(box({ x: 0, y: d.lower[4]!.yt - 0.06, z: d.dashZ, sx: d.lower[4]!.w * 1.7, sy: 0.16, sz: 0.4 }, interior));
-  const belt = d.lower[4]!.yt;
+  body.add(box({ x: 0, y: d.belt - 0.06, z: d.dashZ, sx: d.halfWidth * 1.7, sy: 0.16, sz: 0.4 }, interior));
+  const belt = d.belt;
   const backBottom = belt - 0.1;
   const backHeight = Math.max(0.25, d.roofY - 0.14 - backBottom); // keep the seat backs inside the roof
   for (const sx of [-0.34, 0.34]) {
@@ -487,14 +567,15 @@ export function buildCar(id: CarId, spec: CarSpec, color: string): { group: THRE
       all.push(w);
       if (isFront) front.push(w);
       else rearContact.push(new THREE.Vector3(s * d.wheelX, 0.02, z));
-      // dark wheel well + fender lip on the body side
+      // dark wheel well + fender lip on the body side, hugging the body where it is narrower than the tyre
+      const sideX = Math.min(d.wheelX + d.tireWidth / 2, bodyHalfAt(d, z) * 0.99);
       const well = new THREE.Mesh(new THREE.CircleGeometry(R + 0.06, 36), trim);
       well.rotation.y = s * Math.PI / 2;
-      well.position.set(s * (d.wheelX + d.tireWidth / 2 - 0.012), R, z);
+      well.position.set(s * (sideX - 0.008), R, z);
       body.add(well);
       const lip = new THREE.Mesh(new THREE.TorusGeometry(R + 0.085, 0.022, 8, 36, Math.PI), paint);
       lip.rotation.y = s * Math.PI / 2;
-      lip.position.set(s * (d.wheelX + d.tireWidth / 2 - 0.004), R, z);
+      lip.position.set(s * sideX, R, z);
       body.add(lip);
     }
   }
@@ -510,5 +591,6 @@ export function buildCar(id: CarId, spec: CarSpec, color: string): { group: THRE
     parts: { body, frontWheels: front, allWheels: all, steeringWheel, paint, head, tail, headPositions, rearContact },
   };
 }
+
 
 

@@ -282,7 +282,7 @@ export class VehicleSim {
       const latUse = clamp(Math.abs(this.vLat) / 6, 0, 1);
       // Weight moves onto the driven rear axle under acceleration (h/L * a/g), so a hard launch
       // bites harder than a gentle one instead of using a fixed static weight share.
-      const rearShare = clamp(0.52 + (CG_HEIGHT / s.wheelbase) * (this.accel / G), 0.42, 0.78);
+      const rearShare = s.awd ? 0.95 : clamp(0.52 + (CG_HEIGHT / s.wheelbase) * (this.accel / G), 0.42, 0.78);
       const Ftmax = s.grip * s.mass * G * rearShare * (1 - 0.5 * latUse);
       let F = (Tcl * ratio) / s.wheelRadius;
       if (Math.abs(F) > Ftmax) {

@@ -163,10 +163,10 @@ export function distanceToTrack(x: number, z: number): number {
   return Math.sqrt(best);
 }
 
-// ---------- Speedway: a 10 km straight, long enough to reach top speed ----------
+// ---------- Speedway: a 30 km straight, long enough for even the 400 km/h hypercar ----------
 
 export const HIGHWAY_START_X = trackSamples[0].x + 14;
-export const HIGHWAY_END_X = 10500;
+export const HIGHWAY_END_X = 30500;
 export const HIGHWAY_HALF_WIDTH = 9;
 export const highwaySamples = straightSamples(
   HIGHWAY_START_X,

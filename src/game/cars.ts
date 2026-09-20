@@ -1,4 +1,4 @@
-﻿export type CarId = "hatchback" | "coupe" | "muscle";
+export type CarId = "hatchback" | "coupe" | "muscle" | "hypercar";
 
 export interface CarSpec {
   id: CarId;
@@ -20,6 +20,8 @@ export interface CarSpec {
   driftGrip: number;
   maxSteer: number;
   wheelbase: number;
+  /** all-wheel drive: every wheel puts power down, so launches are not limited by rear-axle grip */
+  awd: boolean;
   defaultColor: string;
   stats: { topSpeed: number; handling: number; grip: number; accel: number };
   /** driver's eye position and bonnet-camera position, in car space (left-hand drive: driver at +x) */
@@ -48,6 +50,7 @@ export const CARS: Record<CarId, CarSpec> = {
     driftGrip: 3.2,
     maxSteer: 0.58,
     wheelbase: 2.5,
+    awd: false,
     defaultColor: "#ff7a1a",
     stats: { topSpeed: 195, handling: 0.8, grip: 0.7, accel: 0.55 },
     eye: [0.34, 1.22, -0.15],
@@ -73,6 +76,7 @@ export const CARS: Record<CarId, CarSpec> = {
     driftGrip: 3.6,
     maxSteer: 0.55,
     wheelbase: 2.6,
+    awd: false,
     defaultColor: "#2fa4ff",
     stats: { topSpeed: 295, handling: 0.95, grip: 0.95, accel: 0.95 },
     eye: [0.36, 1.02, -0.35],
@@ -98,18 +102,45 @@ export const CARS: Record<CarId, CarSpec> = {
     driftGrip: 2.6,
     maxSteer: 0.52,
     wheelbase: 2.9,
+    awd: false,
     defaultColor: "#d9d9d9",
     stats: { topSpeed: 290, handling: 0.6, grip: 0.8, accel: 0.85 },
     eye: [0.36, 1.16, -0.4],
     hoodCam: [0, 1.42, 1.0],
   },
-};
+  hypercar: {
+    id: "hypercar",
+    mass: 1560,
+    maxTorque: 1000,
+    idleRpm: 950,
+    redline: 8500,
+    maxRpm: 9000,
+    cylinders: 10,
+    gearRatios: [3.5, 2.35, 1.7, 1.3, 1.02, 0.8],
+    reverseRatio: 3.3,
+    finalDrive: 3.3,
+    wheelRadius: 0.34,
+    engineInertia: 0.22,
+    drag: 0.36,
+    brakeForce: 26000,
+    grip: 1.45,
+    gripLat: 12,
+    driftGrip: 4.2,
+    maxSteer: 0.5,
+    wheelbase: 2.75,
+    awd: true,
+    defaultColor: "#f4c20d",
+    stats: { topSpeed: 400, handling: 0.95, grip: 1, accel: 1 },
+    eye: [0.34, 0.98, -0.25],
+    hoodCam: [0, 0.98, 1.2],
+  },};
 
 export function torqueCurve(t: number): number {
   // t = rpm / redline. Peak around 65% of redline, softer at both ends.
   const d = (t - 0.62) / 0.62;
   return Math.max(0.3, 1 - 0.65 * d * d);
 }
+
 
 
 

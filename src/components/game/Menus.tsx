@@ -43,7 +43,7 @@ function CarCard({ spec, selected, onSelect }: { spec: CarSpec; selected: boolea
     >
       <div className="mb-2 font-display text-xs tracking-wider">{t(spec.id)}</div>
       <div className="flex flex-col gap-1.5">
-        <StatBar label={`${t("topSpeed")} · ${spec.stats.topSpeed}`} value={spec.stats.topSpeed / 300} />
+        <StatBar label={`${t("topSpeed")} · ${spec.stats.topSpeed}`} value={spec.stats.topSpeed / 420} />
         <StatBar label={t("accel")} value={spec.stats.accel} />
         <StatBar label={t("handling")} value={spec.stats.handling} />
         <StatBar label={t("grip")} value={spec.stats.grip} />
@@ -122,9 +122,9 @@ export function MainMenu() {
           <p className="text-center text-[0.65rem] tracking-wider text-muted-foreground">{t("version")}</p>
         </div>
 
-        <div className="glass animate-float-in w-full max-w-xl rounded-2xl p-4">
+        <div className="glass animate-float-in w-full max-w-2xl rounded-2xl p-4">
           <h2 className="mb-3 font-display text-xs tracking-[0.2em] text-primary">{t("garage").toUpperCase()}</h2>
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {(Object.keys(CARS) as CarId[]).map((id) => (
               <CarCard key={id} spec={CARS[id]} selected={settings.carId === id} onSelect={() => pickCar(id)} />
             ))}
